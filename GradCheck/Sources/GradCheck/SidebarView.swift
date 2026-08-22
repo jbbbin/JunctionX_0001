@@ -10,6 +10,8 @@ struct SidebarView: View {
                 .padding(.top, 18)
                 .padding(.bottom, 20)
 
+            applicationSectionHeader
+
             VStack(spacing: 4) {
                 navigationButton(.overview)
                 supportDocumentsButton
@@ -27,6 +29,31 @@ struct SidebarView: View {
                 .padding(.vertical, 14)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var applicationSectionHeader: some View {
+        HStack(spacing: 8) {
+            Text("APPLICATION")
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .tracking(1.15)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button {
+                state.showNewWorkspace = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(GCTheme.brand)
+            .help("새 지원 목표")
+            .accessibilityLabel("새 지원 목표")
+        }
+        .padding(.leading, 19)
+        .padding(.trailing, 15)
+        .padding(.bottom, 8)
     }
 
     private var supportDocumentsButton: some View {
