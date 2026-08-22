@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct OverviewView: View {
-    @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var state: AppViewModel
 
     private var priorityFindings: [AuditFinding] {
         Array(state.findings.filter { $0.status != .ready }.prefix(3))
@@ -62,7 +62,11 @@ struct OverviewView: View {
                         .frame(maxWidth: 610, alignment: .leading)
                     HStack(spacing: 10) {
                         Button {
-                            if !state.hasCurrentAudit {
+                            if state.requirements.isEmpty || state.requiredDocumentTypes.isEmpty {
+                                state.destination = .requirements
+                            } else if state.readyDocumentCount < state.requiredDocumentCount {
+                                state.destination = .documents
+                            } else if !state.hasCurrentAudit {
                                 state.runAudit()
                             } else if state.blockedCount > 0 || state.humanReviewCount > 0 {
                                 state.destination = .audit
@@ -119,17 +123,29 @@ struct OverviewView: View {
     }
 
     private var heroEyebrow: String {
+        if state.requirements.isEmpty { return "REQUIREMENTS FIRST" }
+        if state.readyDocumentCount < state.requiredDocumentCount { return "DOCUMENTS REQUIRED" }
         if !state.hasCurrentAudit { return "AUDIT REQUIRED" }
         return state.blockedCount > 0 ? "REVIEW NEEDED" : "READY FOR FINAL REVIEW"
     }
 
     private var heroTitle: String {
+        if state.requirements.isEmpty { return "공식 모집요강부터 확인해 주세요" }
+        if state.readyDocumentCount < state.requiredDocumentCount {
+            return "필요 서류 \(state.requiredDocumentCount - state.readyDocumentCount)개가 남았어요"
+        }
         if !state.hasCurrentAudit { return "현재 문서로 검수를 시작해 주세요" }
         if state.blockedCount == 0 { return "제출 전 직접 확인만 남았어요" }
         return "\(state.blockedCount)개의 문제를 먼저 해결해 주세요"
     }
 
     private var heroMessage: String {
+        if state.requirements.isEmpty {
+            return "학교와 프로그램마다 필요한 서류가 다릅니다. 공식 모집요강을 먼저 분석해 이 지원서만의 체크리스트를 만드세요."
+        }
+        if state.readyDocumentCount < state.requiredDocumentCount {
+            return "분석한 모집요강을 기준으로 제출 파일과 수량을 구성했습니다. 필요한 파일을 채운 뒤 교차 검수를 시작할 수 있어요."
+        }
         if !state.hasCurrentAudit {
             return "문서가 바뀌면 이전 결과는 자동으로 무효화됩니다. 현재 파일을 기준으로 누락과 불일치, 페이지 근거를 다시 만들어요."
         }
@@ -140,6 +156,8 @@ struct OverviewView: View {
     }
 
     private var heroActionTitle: String {
+        if state.requirements.isEmpty { return "모집요강 추가" }
+        if state.readyDocumentCount < state.requiredDocumentCount { return "필요 서류 채우기" }
         if !state.hasCurrentAudit { return "검수 시작" }
         return state.blockedCount > 0 ? "문제부터 확인" : "다시 검수"
     }
@@ -165,11 +183,16 @@ struct OverviewView: View {
 
                 if !state.hasCurrentAudit {
                     EmptyStateView(
-                        symbol: "sparkles",
-                        title: "현재 문서의 검수가 필요해요",
-                        message: "지원 패키지 검수를 실행하면 우선순위와 원문 근거가 여기에 표시됩니다.",
-                        actionTitle: "검수 시작",
-                        action: { state.runAudit() }
+                        symbol: state.requirements.isEmpty ? "building.columns" : "sparkles",
+                        title: state.requirements.isEmpty ? "모집요강이 필요해요" : "현재 문서의 검수가 필요해요",
+                        message: state.requirements.isEmpty
+                            ? "공식 모집요강을 먼저 분석해 지원서별 필요 서류를 구성하세요."
+                            : "지원 패키지 검수를 실행하면 우선순위와 원문 근거가 여기에 표시됩니다.",
+                        actionTitle: state.requirements.isEmpty ? "모집요강 추가" : "검수 시작",
+                        action: {
+                            if state.requirements.isEmpty { state.destination = .requirements }
+                            else { state.runAudit() }
+                        }
                     )
                 } else if priorityFindings.isEmpty {
                     EmptyStateView(
@@ -231,25 +254,41 @@ struct OverviewView: View {
                 HStack {
                     SectionTitle("지원 서류", eyebrow: "DOCUMENTS")
                     Spacer()
-                    Text("\(state.coreDocumentCount) / 4")
+                    Text("\(state.readyDocumentCount) / \(state.requiredDocumentCount)")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundStyle(GCTheme.brand)
                 }
-                HStack(spacing: 8) {
-                    ForEach([DocumentType.cv, .sop, .transcript, .englishScore]) { type in
-                        let exists = state.documents.contains { $0.type == type && $0.processingStatus == .ready }
-                        VStack(spacing: 7) {
-                            Image(systemName: exists ? "checkmark.circle.fill" : type.symbol)
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(exists ? ReviewStatus.ready.color : Color.secondary)
-                            Text(type.shortTitle)
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(exists ? GCTheme.ink : .secondary)
+                if state.requiredDocumentTypes.isEmpty {
+                    Text("모집요강을 추가하면 필요 서류가 여기에 표시됩니다.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(spacing: 7) {
+                        ForEach(state.requiredDocumentTypes.prefix(5)) { type in
+                            let ready = state.readyCount(for: type)
+                            let required = state.requiredCount(for: type)
+                            HStack(spacing: 9) {
+                                Image(systemName: ready >= required ? "checkmark.circle.fill" : type.symbol)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(ready >= required ? ReviewStatus.ready.color : Color.secondary)
+                                    .frame(width: 20)
+                                Text(type.shortTitle)
+                                    .font(.system(size: 10, weight: .semibold))
+                                Spacer()
+                                Text("\(ready)/\(required)")
+                                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                                    .foregroundStyle(ready >= required ? ReviewStatus.ready.color : .secondary)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(ready >= required ? ReviewStatus.ready.color.opacity(0.07) : Color.black.opacity(0.025))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background(exists ? ReviewStatus.ready.color.opacity(0.07) : Color.black.opacity(0.025))
-                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        if state.requiredDocumentTypes.count > 5 {
+                            Text("외 \(state.requiredDocumentTypes.count - 5)개 유형")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Button("서류 관리") { state.destination = .documents }

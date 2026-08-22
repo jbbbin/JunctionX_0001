@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct WorkspaceHeader: View {
-    @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var state: AppViewModel
 
     var body: some View {
         HStack(spacing: 16) {
@@ -50,7 +50,8 @@ struct WorkspaceHeader: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(GCTheme.brand)
-            .disabled(state.isAuditing || state.isImporting)
+            .disabled(!state.canRunAudit)
+            .help(state.requirements.isEmpty ? "먼저 공식 모집요강을 추가해 주세요." : "현재 지원 패키지를 다시 검수합니다.")
         }
         .padding(.horizontal, 28)
         .padding(.top, 19)

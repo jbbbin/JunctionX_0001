@@ -17,24 +17,24 @@ struct RequirementExtractor {
                 let lowered = line.lowercased()
                 let type = relatedType(in: lowered)
                 let isNamedRequirement = type != nil
-                    || lowered.contains("recommendation")
                     || lowered.contains("deadline")
-                    || lowered.contains("gre")
-                    || lowered.contains("portfolio")
                 let constraints = constraints(in: line)
 
                 if isNamedRequirement {
+                    let conditional = containsConditionalLanguage(lowered)
                     let item = RequirementItem(
                         title: requirementTitle(for: type, line: line),
                         detail: String(line.prefix(300)),
                         scope: requirementScope(in: lowered),
-                        status: containsConditionalLanguage(lowered) ? .humanReview : .ready,
+                        status: conditional ? .humanReview : .ready,
                         sourceName: sourceName,
                         page: pageNumber,
                         relatedDocumentType: type,
                         maximumPages: constraints.maximumPages,
                         maximumWords: constraints.maximumWords,
-                        requiredFileExtension: constraints.requiredFileExtension
+                        requiredFileExtension: constraints.requiredFileExtension,
+                        necessity: lowered.contains("deadline") ? .informational : (conditional ? .conditional : .required),
+                        requiredCount: requiredCount(in: lowered)
                     )
                     activeRequirementIndex = merge(item, into: &items)
                     continue
@@ -57,7 +57,9 @@ struct RequirementExtractor {
                     relatedDocumentType: active.relatedDocumentType,
                     maximumPages: constraints.maximumPages,
                     maximumWords: constraints.maximumWords,
-                    requiredFileExtension: constraints.requiredFileExtension
+                    requiredFileExtension: constraints.requiredFileExtension,
+                    necessity: containsConditionalLanguage(lowered) ? .conditional : active.effectiveNecessity,
+                    requiredCount: requiredCount(in: lowered)
                 )
                 items[activeRequirementIndex] = merged(items[activeRequirementIndex], with: continuation)
             }
@@ -88,16 +90,24 @@ struct RequirementExtractor {
         if value.contains("toefl") || value.contains("ielts") || value.contains("english proficiency") || value.contains("english score") {
             return .englishScore
         }
+        if value.contains("recommendation") || value.contains("reference letter") || value.contains("recommender") {
+            return .recommendation
+        }
+        if value.contains("gre") || value.contains("gmat") { return .greScore }
+        if value.contains("writing sample") { return .writingSample }
+        if value.contains("portfolio") { return .portfolio }
+        if value.contains("research proposal") || value.contains("research plan") { return .researchProposal }
+        if value.contains("degree certificate") || value.contains("graduation certificate") || value.contains("diploma") {
+            return .degreeCertificate
+        }
+        if value.contains("passport") || value.contains("visa application") { return .passportVisa }
         return nil
     }
 
     private func requirementTitle(for type: DocumentType?, line: String) -> String {
         if let type { return type.title }
         let lowered = line.lowercased()
-        if lowered.contains("recommendation") { return "추천서" }
         if lowered.contains("deadline") { return "지원 마감일" }
-        if lowered.contains("gre") { return "GRE" }
-        if lowered.contains("portfolio") { return "포트폴리오" }
         return "기타 공식 요건"
     }
 
@@ -178,12 +188,17 @@ struct RequirementExtractor {
         result.maximumPages = result.maximumPages ?? incoming.maximumPages
         result.maximumWords = result.maximumWords ?? incoming.maximumWords
         result.requiredFileExtension = result.requiredFileExtension ?? incoming.requiredFileExtension
+        result.requiredCount = result.requiredCount ?? incoming.requiredCount
 
         if result.status == .humanReview || incoming.status == .humanReview
             || hasConflictingConstraint(result.maximumPages, incoming.maximumPages)
             || hasConflictingConstraint(result.maximumWords, incoming.maximumWords)
-            || hasConflictingConstraint(result.requiredFileExtension, incoming.requiredFileExtension) {
+            || hasConflictingConstraint(result.requiredFileExtension, incoming.requiredFileExtension)
+            || hasConflictingConstraint(result.requiredCount, incoming.requiredCount) {
             result.status = .humanReview
+            result.necessity = .conditional
+        } else if result.effectiveNecessity == .informational {
+            result.necessity = incoming.effectiveNecessity
         }
         return result
     }
@@ -208,6 +223,19 @@ struct RequirementExtractor {
               let match = regex.firstMatch(in: value, range: NSRange(value.startIndex..<value.endIndex, in: value)),
               let range = Range(match.range(at: 1), in: value) else { return nil }
         return Int(value[range].replacingOccurrences(of: ",", with: ""))
+    }
+
+    private func requiredCount(in value: String) -> Int? {
+        if let count = integerCapture(#"(?i)(\d{1,2})\s*(?:letters?\s+of\s+recommendation|recommendation\s+letters?|references?)"#, in: value) {
+            return count
+        }
+        let numberWords = [
+            "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+            "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10
+        ]
+        return numberWords.first { word, _ in
+            value.range(of: #"\b\#(word)\b.{0,24}\b(?:recommendation|reference)"#, options: .regularExpression) != nil
+        }?.value
     }
 }
 

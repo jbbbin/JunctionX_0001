@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct AuditReportView: View {
-    @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var state: AppViewModel
     @State private var filter: FindingFilter = .all
 
     private var filteredFindings: [AuditFinding] {
@@ -252,7 +252,7 @@ private struct FindingListRow: View {
 }
 
 private struct FindingDetailView: View {
-    @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var state: AppViewModel
     let finding: AuditFinding
 
     var body: some View {

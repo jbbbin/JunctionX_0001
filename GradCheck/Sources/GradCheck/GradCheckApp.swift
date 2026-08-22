@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct GradCheckApp: App {
-    @StateObject private var state = AppState()
+    @StateObject private var state = AppViewModel()
 
     var body: some Scene {
         WindowGroup {
@@ -24,7 +24,7 @@ struct GradCheckApp: App {
                     state.runAudit()
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(state.isAuditing || state.isImporting)
+                .disabled(!state.canRunAudit)
             }
         }
     }

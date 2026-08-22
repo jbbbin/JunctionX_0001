@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SidebarView: View {
-    @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var state: AppViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -17,8 +17,16 @@ struct SidebarView: View {
                 .padding(.horizontal, 19)
                 .padding(.bottom, 8)
 
-            applicationCard
+            ScrollView {
+                LazyVStack(spacing: 6) {
+                    ForEach(state.workspaces) { workspace in
+                        applicationCard(workspace)
+                    }
+                }
                 .padding(.horizontal, 10)
+            }
+            .scrollIndicators(.hidden)
+            .frame(maxHeight: 230)
 
             Button {
                 state.showNewWorkspace = true
@@ -103,8 +111,10 @@ struct SidebarView: View {
         }
     }
 
-    private var applicationCard: some View {
-        Button {
+    private func applicationCard(_ workspace: ApplicationWorkspace) -> some View {
+        let isSelected = workspace.id == state.selectedWorkspaceID
+        return Button {
+            state.selectWorkspace(workspace.id)
             state.destination = .overview
         } label: {
             VStack(alignment: .leading, spacing: 9) {
@@ -112,16 +122,16 @@ struct SidebarView: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(GCTheme.brandSoft)
-                        Text(state.workspace.school.prefix(1))
+                        Text(workspace.school.prefix(1))
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(GCTheme.brand)
                     }
                     .frame(width: 31, height: 31)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(state.workspace.school)
+                        Text(workspace.school)
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(GCTheme.ink)
-                        Text(state.workspace.program)
+                        Text(workspace.program)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
@@ -130,26 +140,27 @@ struct SidebarView: View {
                 }
                 HStack {
                     Circle()
-                        .fill(state.workspace.status.color)
+                        .fill(workspace.status.color)
                         .frame(width: 6, height: 6)
-                    Text(state.workspace.status.label)
+                    Text(workspace.status.label)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(state.workspace.status.color)
+                        .foregroundStyle(workspace.status.color)
                     Spacer()
-                    Text(state.workspace.intake)
+                    Text(workspace.intake)
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
             }
             .padding(11)
-            .background(.thinMaterial)
+            .background(isSelected ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.thinMaterial))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(GCTheme.brand.opacity(0.14), lineWidth: 1)
+                    .stroke(isSelected ? GCTheme.brand.opacity(0.55) : GCTheme.brand.opacity(0.10), lineWidth: isSelected ? 1.5 : 1)
             }
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var connectionCard: some View {

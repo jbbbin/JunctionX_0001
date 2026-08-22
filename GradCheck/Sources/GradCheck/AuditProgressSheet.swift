@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AuditProgressSheet: View {
-    @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var state: AppViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

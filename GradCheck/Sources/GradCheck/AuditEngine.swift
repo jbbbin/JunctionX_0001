@@ -1,7 +1,7 @@
 import Foundation
 
 struct AuditEngine {
-    private let coreTypes: [DocumentType] = [.cv, .sop, .transcript, .englishScore]
+    private let legacyCoreTypes: [DocumentType] = [.cv, .sop, .transcript, .englishScore]
     private let extractor = FactExtractor()
 
     func findings(
@@ -15,7 +15,7 @@ struct AuditEngine {
             return extractor.extract(document: document, content: content)
         }
 
-        var results = completenessFindings(documents: documents)
+        var results = completenessFindings(documents: documents, requirements: requirements)
         results.append(contentsOf: targetFindings(workspace: workspace, facts: facts))
         results.append(contentsOf: identityFindings(workspace: workspace, facts: facts))
         results.append(contentsOf: educationFindings(facts: facts))
@@ -29,40 +29,80 @@ struct AuditEngine {
         }
     }
 
-    private func completenessFindings(documents: [DocumentItem]) -> [AuditFinding] {
-        coreTypes.map { type in
-            if let document = documents.first(where: { $0.type == type && $0.processingStatus == .ready }) {
-                return AuditFinding(
-                    status: .ready,
-                    category: .completeness,
-                    title: "\(type.title) 파일을 확인했어요",
-                    summary: "필수 검수 슬롯에 분석 가능한 문서가 등록되어 있습니다.",
-                    action: "세부 사실 대조 결과를 확인하세요.",
-                    evidences: [
-                        EvidenceRef(
-                            documentName: document.filename,
-                            documentType: type,
-                            page: 1,
-                            excerpt: document.metadata.isEmpty ? "업로드 및 분석 완료" : document.metadata,
-                            fieldLabel: "업로드 상태"
-                        )
-                    ]
+    private func completenessFindings(
+        documents: [DocumentItem],
+        requirements: [RequirementItem]
+    ) -> [AuditFinding] {
+        let derivedTypes = RequirementAnalysisResult.requiredTypes(from: requirements)
+        let types = derivedTypes.isEmpty ? legacyCoreTypes : derivedTypes
+        return types.map { type in
+            let expectedCount = max(
+                RequirementAnalysisResult.requiredCount(for: type, in: requirements),
+                1
+            )
+            let readyDocuments = documents.filter {
+                $0.type == type && $0.processingStatus == .ready
+            }
+            let requirement = requirements.first {
+                $0.relatedDocumentType == type && $0.effectiveNecessity != .informational
+            }
+            let requirementEvidence = requirement.map {
+                EvidenceRef(
+                    documentName: $0.sourceName,
+                    documentType: .requirements,
+                    page: $0.page,
+                    excerpt: $0.detail,
+                    fieldLabel: "공식 요건"
                 )
             }
-            return AuditFinding(
-                status: .blocked,
-                category: .completeness,
-                title: "\(type.title) 파일이 필요해요",
-                summary: "핵심 지원 서류가 없거나 다시 분석해야 해서 검수를 완료할 수 없습니다.",
-                action: "\(type.title) 파일을 추가한 뒤 다시 검수하세요.",
-                evidences: [
+
+            if readyDocuments.count >= expectedCount, let document = readyDocuments.first {
+                var evidences = [
                     EvidenceRef(
-                        documentName: "지원 서류 묶음",
+                        documentName: document.filename,
                         documentType: type,
-                        excerpt: "not_stated · 분석 가능한 파일 없음",
+                        page: 1,
+                        excerpt: expectedCount > 1
+                            ? "\(readyDocuments.count)부 업로드 및 분석 완료"
+                            : (document.metadata.isEmpty ? "업로드 및 분석 완료" : document.metadata),
                         fieldLabel: "업로드 상태"
                     )
                 ]
+                if let requirementEvidence { evidences.append(requirementEvidence) }
+                return AuditFinding(
+                    status: .ready,
+                    category: .completeness,
+                    title: expectedCount > 1
+                        ? "\(type.title) \(expectedCount)부를 확인했어요"
+                        : "\(type.title) 파일을 확인했어요",
+                    summary: "공식 모집요강에서 확인한 제출 수량만큼 분석 가능한 문서가 등록되어 있습니다.",
+                    action: "세부 사실 대조 결과를 확인하세요.",
+                    evidences: evidences
+                )
+            }
+            let isConditional = requirement?.effectiveNecessity == .conditional
+            var evidences = [
+                EvidenceRef(
+                    documentName: "지원 서류 묶음",
+                    documentType: type,
+                    excerpt: "\(readyDocuments.count)/\(expectedCount)부 · 분석 가능한 파일 부족",
+                    fieldLabel: "업로드 상태"
+                )
+            ]
+            if let requirementEvidence { evidences.append(requirementEvidence) }
+            return AuditFinding(
+                status: isConditional ? .humanReview : .blocked,
+                category: .completeness,
+                title: expectedCount > 1
+                    ? "\(type.title) \(expectedCount)부가 필요해요"
+                    : "\(type.title) 파일이 필요해요",
+                summary: isConditional
+                    ? "조건부 제출 또는 면제 여부를 먼저 확인해야 합니다. 현재 \(readyDocuments.count)/\(expectedCount)부가 준비되었습니다."
+                    : "공식 모집요강 기준 \(expectedCount)부 중 \(readyDocuments.count)부만 분석할 수 있습니다.",
+                action: isConditional
+                    ? "공식 조건을 직접 확인하고 해당되면 파일을 추가하세요."
+                    : "\(type.title) 파일을 추가한 뒤 다시 검수하세요.",
+                evidences: evidences
             )
         }
     }
@@ -200,7 +240,10 @@ struct AuditEngine {
     }
 
     private func identityFindings(workspace: ApplicationWorkspace, facts: [DocumentFacts]) -> [AuditFinding] {
-        let coreFacts = facts.filter { $0.document.type.isCore }
+        let identityTypes: Set<DocumentType> = [
+            .cv, .sop, .transcript, .englishScore, .degreeCertificate, .passportVisa
+        ]
+        let coreFacts = facts.filter { identityTypes.contains($0.document.type) }
         let names = coreFacts.compactMap { $0.names.first }
         var findings: [AuditFinding] = []
 
@@ -590,16 +633,8 @@ struct AuditEngine {
             }
 
             guard let document = documents.first(where: { $0.type == type && $0.processingStatus == .ready }) else {
-                findings.append(
-                    AuditFinding(
-                        status: requirement.status == .humanReview ? .humanReview : .blocked,
-                        category: .completeness,
-                        title: "공식 요건에 필요한 \(type.shortTitle) 문서를 찾지 못했어요",
-                        summary: "모집요강에 \(requirement.title) 항목이 있지만 분석 가능한 대응 문서가 없습니다.",
-                        action: "필수 여부를 확인한 뒤 파일을 추가하고 다시 검수하세요.",
-                        evidences: [requirementEvidence]
-                    )
-                )
+                // Requirement-derived completeness findings already report missing
+                // files and quantities once per document type.
                 continue
             }
 
@@ -646,7 +681,7 @@ struct AuditEngine {
 
     private func verifiabilityFindings(documents: [DocumentItem], extracted: [UUID: ExtractedDocument]) -> [AuditFinding] {
         documents.compactMap { document in
-            guard document.type.isCore,
+            guard document.type.isApplicantDocument,
                   document.processingStatus != .parsing,
                   extracted[document.id] == nil,
                   !document.isSample else { return nil }

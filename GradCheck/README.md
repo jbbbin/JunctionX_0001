@@ -1,6 +1,8 @@
 # GradCheck
 
-GradCheck는 미국 대학원 지원을 준비하는 한국인 사용자를 위한 네이티브 macOS 문서 QA 워크스페이스입니다. 공식 모집 요건과 CV, SOP, 성적표, 공인영어성적을 대조해 누락·오탈자·문서 간 불일치를 파일 및 페이지 근거와 함께 보여줍니다.
+GradCheck는 해외 대학원 지원을 준비하는 사용자를 위한 네이티브 macOS 문서 QA 워크스페이스입니다. 여러 학교·프로그램의 지원서를 독립적으로 관리하고, 각 지원서의 공식 모집요강에서 추출한 필요 서류와 실제 파일을 대조해 누락·오탈자·문서 간 불일치를 페이지 근거와 함께 보여줍니다.
+
+새 지원서는 `지원 목표 → 공식 모집요강 분석 → 필요 서류 검토 → 지원 파일 업로드` 순서로 만듭니다. CV, SOP, 성적표에 고정되지 않고 추천서 수량, GRE/GMAT, Writing Sample, 포트폴리오, 연구계획서, 학위증명, 여권·비자 서류 등 모집요강에서 확인된 항목으로 체크리스트가 동적으로 구성됩니다.
 
 저장소에는 실제 개인정보가 없는 결정론적 샘플 워크스페이스와 오프라인 우선 문서 흐름이 포함되어 있습니다. 텍스트 레이어가 있는 PDF와 텍스트 파일은 로컬에서 읽고, 실행 환경에 `UPSTAGE_API_KEY`가 있을 때만 Upstage Document Parse 어댑터가 활성화됩니다.
 
@@ -33,7 +35,15 @@ swift run GradCheck
 
 Xcode 스킴의 환경 변수에 `UPSTAGE_API_KEY`를 설정하세요. 이후 가져온 PDF와 이미지는 GradCheck 검증 규칙을 실행하기 전에 Upstage Document Parse로 구조화됩니다. 키가 없으면 지원되는 PDF 및 텍스트 콘텐츠를 온디바이스로 추출하며 샘플 데모는 그대로 동작합니다.
 
-API 키, 지원자 이름, 파일명, 원문 텍스트와 evidence excerpt는 앱 설정에 기록하지 않습니다. 가져온 문서 텍스트는 현재 프로세스의 메모리에만 유지하며 앱을 다시 열면 문서를 다시 추가해야 합니다. 로컬에는 학교·프로그램·학위·학기와 민감값이 없는 검수 이력 개수만 저장합니다.
+모델 교체와 별도 배포 환경을 위해 다음 설정도 선택적으로 사용할 수 있습니다.
+
+- `UPSTAGE_DOCUMENT_MODEL`: 기본값 `document-parse`
+- `UPSTAGE_DOCUMENT_ENDPOINT`: 기본값 `https://api.upstage.ai/v1/document-digitization`
+- `UPSTAGE_DOCUMENT_TIMEOUT`: 요청 제한 시간(초), 기본값 `90`
+
+문서 분석은 `DocumentAnalyzing`/`DocumentModelService` 프로토콜 뒤에 있으며, 다른 Upstage 모델이나 추가 공급자를 앱의 ViewModel과 분리해 붙일 수 있습니다. 앱 상태는 `AppViewModel`, 다중 지원서 도메인은 `ApplicationPortfolio`/`ApplicationSession`, 저장은 `ApplicationRepository`가 담당합니다.
+
+API 키, 지원자 이름, 지원자 서류 파일명, 원문 텍스트와 evidence excerpt는 앱 설정에 기록하지 않습니다. 가져온 지원자 문서 텍스트는 현재 프로세스의 메모리에만 유지하며 앱을 다시 열면 문서를 다시 추가해야 합니다. 로컬에는 학교·프로그램·학위·학기, 공식 모집요강의 파일명과 구조화된 요건, 민감값이 없는 검수 이력 개수만 저장합니다.
 
 ## 제품 경계
 

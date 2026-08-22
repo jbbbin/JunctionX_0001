@@ -3,7 +3,7 @@ import XCTest
 @testable import GradCheck
 
 @MainActor
-final class AppStateImportTests: XCTestCase {
+final class AppViewModelTests: XCTestCase {
     func testRegistersMultipleRequirementSourcesAndReplacesOnlySameFilename() async throws {
         let state = makeWorkspace()
         let root = try makeTemporaryDirectory()
@@ -127,7 +127,7 @@ final class AppStateImportTests: XCTestCase {
     }
 
     func testRealFileInsideSampleCountsAsUserWorkspaceData() async throws {
-        let state = AppState(loadSavedState: false, environment: [:])
+        let state = AppViewModel(loadSavedState: false, environment: [:])
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let url = try write(
@@ -144,16 +144,19 @@ final class AppStateImportTests: XCTestCase {
     }
 
     func testCreatingWorkspaceCancelsInFlightAudit() async throws {
-        let state = AppState(loadSavedState: false, environment: [:])
+        let state = AppViewModel(loadSavedState: false, environment: [:])
         state.runAudit()
         XCTAssertTrue(state.isAuditing)
 
-        state.createWorkspace(
-            school: "Stanford University",
-            program: "Computer Science",
-            degree: "MS",
-            intake: "Fall 2028",
-            applicantName: ""
+        state.addWorkspace(
+            draft: WorkspaceDraft(
+                school: "Stanford University",
+                program: "Computer Science",
+                degree: "MS",
+                intake: "Fall 2028",
+                applicantName: ""
+            ),
+            analysis: requirementAnalysis(type: .sop, source: "stanford.txt")
         )
         try await Task.sleep(for: .milliseconds(40))
 
@@ -161,46 +164,154 @@ final class AppStateImportTests: XCTestCase {
         XCTAssertNil(state.workspace.lastAuditedAt)
         XCTAssertFalse(state.isAuditing)
         XCTAssertFalse(state.hasCurrentAudit)
-        XCTAssertEqual(state.findings.filter { $0.status == .blocked }.count, 4)
+        XCTAssertTrue(state.findings.isEmpty)
     }
 
     func testRevisedSyntheticSampleRestoresWithoutPersistingRawUserDocuments() async throws {
-        let defaults = UserDefaults.standard
-        let storageKey = "GradCheck.workspace.v2"
-        let legacyKey = "GradCheck.workspace.v1"
-        let previous = defaults.object(forKey: storageKey)
-        let previousLegacy = defaults.object(forKey: legacyKey)
-        defer {
-            if let previous { defaults.set(previous, forKey: storageKey) } else { defaults.removeObject(forKey: storageKey) }
-            if let previousLegacy { defaults.set(previousLegacy, forKey: legacyKey) } else { defaults.removeObject(forKey: legacyKey) }
-        }
+        let suiteName = "GradCheckTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let repository = UserDefaultsApplicationRepository(defaults: defaults)
+        let dependencies = AppDependencies(
+            documentAnalyzer: DocumentPipeline(environment: [:]),
+            requirementsAnalyzer: RequirementExtractor(),
+            auditor: AuditEngine(),
+            repository: repository
+        )
 
-        let state = AppState(loadSavedState: false, environment: [:])
+        let state = AppViewModel(dependencies: dependencies)
         state.applyRevisedSampleSOP()
 
-        let unauditedRestore = AppState(loadSavedState: true, environment: [:])
+        let unauditedRestore = AppViewModel(dependencies: dependencies)
         XCTAssertTrue(unauditedRestore.documents.contains { $0.filename == "JiyoonKim_SOP_revised.pdf" })
         XCTAssertFalse(unauditedRestore.hasCurrentAudit)
 
         unauditedRestore.runAudit()
         try await waitForAudit(toFinishIn: unauditedRestore)
-        let auditedRestore = AppState(loadSavedState: true, environment: [:])
+        let auditedRestore = AppViewModel(dependencies: dependencies)
 
         XCTAssertTrue(auditedRestore.documents.contains { $0.filename == "JiyoonKim_SOP_revised.pdf" })
         XCTAssertTrue(auditedRestore.hasCurrentAudit)
         XCTAssertEqual(auditedRestore.blockedCount, 1)
     }
 
-    private func makeWorkspace() -> AppState {
-        let state = AppState(loadSavedState: false, environment: [:])
-        state.createWorkspace(
-            school: "MIT",
-            program: "EECS",
-            degree: "PhD",
-            intake: "Fall 2027",
-            applicantName: "Jiyoon Kim"
+    func testAddingMultipleRequirementBackedWorkspacesPreservesEachSession() {
+        let state = AppViewModel(loadSavedState: false, environment: [:])
+        let first = requirementAnalysis(type: .sop, source: "mit.txt")
+        state.addWorkspace(
+            draft: WorkspaceDraft(
+                school: "MIT",
+                program: "EECS",
+                degree: "PhD",
+                intake: "Fall 2027",
+                applicantName: ""
+            ),
+            analysis: first
+        )
+        let firstID = state.selectedWorkspaceID
+
+        let second = requirementAnalysis(type: .portfolio, source: "risd.txt")
+        state.addWorkspace(
+            draft: WorkspaceDraft(
+                school: "RISD",
+                program: "Industrial Design",
+                degree: "MFA",
+                intake: "Fall 2028",
+                applicantName: ""
+            ),
+            analysis: second
+        )
+        let secondID = state.selectedWorkspaceID
+
+        XCTAssertNotEqual(firstID, secondID)
+        XCTAssertEqual(state.workspaces.count, 3) // two user workspaces plus the sample
+        XCTAssertEqual(state.requiredDocumentTypes, [.portfolio])
+
+        state.selectWorkspace(firstID)
+        XCTAssertEqual(state.workspace.school, "MIT")
+        XCTAssertEqual(state.requiredDocumentTypes, [.sop])
+
+        state.selectWorkspace(secondID)
+        XCTAssertEqual(state.workspace.school, "RISD")
+        XCTAssertEqual(state.requiredDocumentTypes, [.portfolio])
+    }
+
+    func testRequirementDerivedReadinessHonorsRequiredRecommendationCount() {
+        let requirements = [
+            RequirementItem(
+                title: "추천서 3부",
+                detail: "Three letters of recommendation are required.",
+                scope: .program,
+                status: .ready,
+                sourceName: "program.txt",
+                relatedDocumentType: .recommendation,
+                requiredCount: 3
+            )
+        ]
+        let documents = (1...2).map {
+            DocumentItem(type: .recommendation, filename: "letter-\($0).pdf")
+        }
+        let session = ApplicationSession(
+            workspace: DemoData.workspace,
+            documents: documents,
+            findings: [],
+            requirements: requirements,
+            history: [],
+            extractedDocuments: [:]
+        )
+
+        XCTAssertEqual(session.requiredDocumentTypes, [.recommendation])
+        XCTAssertEqual(session.requiredDocumentCount, 3)
+        XCTAssertEqual(session.readyDocumentCount, 2)
+    }
+
+    func testWorkspaceCreationRejectsMissingRequirementAnalysis() {
+        let state = AppViewModel(loadSavedState: false, environment: [:])
+        state.addWorkspace(
+            draft: WorkspaceDraft(
+                school: "MIT",
+                program: "EECS",
+                degree: "PhD",
+                intake: "Fall 2027",
+                applicantName: ""
+            ),
+            analysis: RequirementAnalysisResult(documents: [], requirements: [], extractions: [:])
+        )
+
+        XCTAssertEqual(state.workspaces.count, 1)
+        XCTAssertNotNil(state.errorMessage)
+    }
+
+    private func makeWorkspace() -> AppViewModel {
+        let state = AppViewModel(loadSavedState: false, environment: [:])
+        state.addWorkspace(
+            draft: WorkspaceDraft(
+                school: "MIT",
+                program: "EECS",
+                degree: "PhD",
+                intake: "Fall 2027",
+                applicantName: "Jiyoon Kim"
+            ),
+            analysis: requirementAnalysis(type: .sop, source: "program.txt")
         )
         return state
+    }
+
+    private func requirementAnalysis(type: DocumentType, source: String) -> RequirementAnalysisResult {
+        let document = DocumentItem(type: .requirements, filename: source)
+        let requirement = RequirementItem(
+            title: type.title,
+            detail: "\(type.title) is required.",
+            scope: .program,
+            status: .ready,
+            sourceName: source,
+            relatedDocumentType: type
+        )
+        return RequirementAnalysisResult(
+            documents: [document],
+            requirements: [requirement],
+            extractions: [document.id: ExtractedDocument(pages: [requirement.detail], provider: "test")]
+        )
     }
 
     private func makeTemporaryDirectory() throws -> URL {
@@ -216,7 +327,7 @@ final class AppStateImportTests: XCTestCase {
         return url
     }
 
-    private func waitForImport(toFinishIn state: AppState) async throws {
+    private func waitForImport(toFinishIn state: AppViewModel) async throws {
         for _ in 0..<300 {
             if !state.isImporting { return }
             try await Task.sleep(for: .milliseconds(10))
@@ -224,7 +335,7 @@ final class AppStateImportTests: XCTestCase {
         XCTFail("Document import did not finish in time")
     }
 
-    private func waitForAudit(toFinishIn state: AppState) async throws {
+    private func waitForAudit(toFinishIn state: AppViewModel) async throws {
         for _ in 0..<300 {
             if !state.isAuditing { return }
             try await Task.sleep(for: .milliseconds(10))

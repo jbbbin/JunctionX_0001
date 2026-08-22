@@ -2,6 +2,24 @@ import XCTest
 @testable import GradCheck
 
 final class RequirementExtractorTests: XCTestCase {
+    func testExtractsExpandedDocumentTypesAndRecommendationCount() {
+        let document = ExtractedDocument(
+            pages: [
+                "Three letters of recommendation are required.\nA writing sample is required.\nPortfolio submission is required."
+            ],
+            provider: "test"
+        )
+
+        let items = RequirementExtractor().extract(from: document, sourceName: "program.txt")
+
+        XCTAssertEqual(
+            items.first { $0.relatedDocumentType == .recommendation }?.requiredCount,
+            3
+        )
+        XCTAssertTrue(items.contains { $0.relatedDocumentType == .writingSample })
+        XCTAssertTrue(items.contains { $0.relatedDocumentType == .portfolio })
+    }
+
     func testExtractsSOPFormatConstraintsWithSourcePage() {
         let content = ExtractedDocument(
             pages: ["Overview", "Statement of Purpose: PDF, maximum 2 pages and max 1,000 words."],

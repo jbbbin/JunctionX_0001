@@ -86,6 +86,13 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
     case sop
     case transcript
     case englishScore
+    case recommendation
+    case greScore
+    case writingSample
+    case portfolio
+    case researchProposal
+    case degreeCertificate
+    case passportVisa
     case requirements
     case other
 
@@ -97,6 +104,13 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         case .sop: "SOP / Personal Statement"
         case .transcript: "성적표"
         case .englishScore: "공인영어성적"
+        case .recommendation: "추천서"
+        case .greScore: "GRE / GMAT 성적"
+        case .writingSample: "Writing Sample"
+        case .portfolio: "포트폴리오"
+        case .researchProposal: "연구계획서"
+        case .degreeCertificate: "학위·졸업증명서"
+        case .passportVisa: "여권·비자 서류"
         case .requirements: "공식 모집요강"
         case .other: "기타 문서"
         }
@@ -108,6 +122,13 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         case .sop: "SOP"
         case .transcript: "성적표"
         case .englishScore: "영어성적"
+        case .recommendation: "추천서"
+        case .greScore: "GRE/GMAT"
+        case .writingSample: "Writing"
+        case .portfolio: "포트폴리오"
+        case .researchProposal: "연구계획"
+        case .degreeCertificate: "학위증명"
+        case .passportVisa: "여권/비자"
         case .requirements: "모집요강"
         case .other: "기타"
         }
@@ -119,6 +140,13 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         case .sop: "text.document"
         case .transcript: "graduationcap"
         case .englishScore: "character.book.closed"
+        case .recommendation: "person.2.badge.gearshape"
+        case .greScore: "chart.bar.doc.horizontal"
+        case .writingSample: "doc.text"
+        case .portfolio: "rectangle.stack"
+        case .researchProposal: "lightbulb.max"
+        case .degreeCertificate: "checkmark.seal"
+        case .passportVisa: "person.text.rectangle"
         case .requirements: "building.columns"
         case .other: "doc"
         }
@@ -128,6 +156,28 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         [.cv, .sop, .transcript, .englishScore].contains(self)
     }
 
+    var isApplicantDocument: Bool {
+        self != .requirements && self != .other
+    }
+
+    var sortOrder: Int {
+        switch self {
+        case .cv: 0
+        case .sop: 1
+        case .transcript: 2
+        case .degreeCertificate: 3
+        case .englishScore: 4
+        case .greScore: 5
+        case .recommendation: 6
+        case .writingSample: 7
+        case .researchProposal: 8
+        case .portfolio: 9
+        case .passportVisa: 10
+        case .requirements: 11
+        case .other: 12
+        }
+    }
+
     static func infer(from filename: String) -> DocumentType {
         let value = filename.lowercased()
         if value.contains("resume") || value.contains("cv") { return .cv }
@@ -135,6 +185,13 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         if value.contains("transcript") || value.contains("성적") { return .transcript }
         if value.contains("toefl") || value.contains("ielts") || value.contains("english") { return .englishScore }
         if value.contains("requirement") || value.contains("admission") || value.contains("모집") { return .requirements }
+        if value.contains("recommend") || value.contains("reference") { return .recommendation }
+        if value.contains("gre") || value.contains("gmat") { return .greScore }
+        if value.contains("writing") || value.contains("sample") { return .writingSample }
+        if value.contains("portfolio") { return .portfolio }
+        if value.contains("research") && (value.contains("proposal") || value.contains("plan")) { return .researchProposal }
+        if value.contains("degree") || value.contains("diploma") || value.contains("graduation") { return .degreeCertificate }
+        if value.contains("passport") || value.contains("visa") { return .passportVisa }
         return .other
     }
 
@@ -163,6 +220,23 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         if value.contains("application requirements") || value.contains("admission requirements") || value.contains("모집 요강") {
             return .requirements
         }
+
+        if value.contains("letter of recommendation") || value.contains("reference letter") || value.contains("recommender") {
+            return .recommendation
+        }
+
+        if (value.contains("gre") || value.contains("gmat"))
+            && (value.contains("score report") || value.contains("test date") || value.contains("percentile")) {
+            return .greScore
+        }
+
+        if value.contains("writing sample") { return .writingSample }
+        if value.contains("portfolio") { return .portfolio }
+        if value.contains("research proposal") || value.contains("research plan") { return .researchProposal }
+        if value.contains("degree certificate") || value.contains("graduation certificate") || value.contains("diploma") {
+            return .degreeCertificate
+        }
+        if value.contains("passport") || value.contains("visa application") { return .passportVisa }
 
         if value.contains("toefl ibt score report")
             || value.contains("ielts test report form")
@@ -325,6 +399,12 @@ enum RequirementScope: String, Codable {
     case program = "프로그램 고유"
 }
 
+enum RequirementNecessity: String, Codable, CaseIterable {
+    case required = "필수"
+    case conditional = "조건부"
+    case informational = "안내"
+}
+
 struct RequirementItem: Identifiable, Codable, Hashable {
     let id: UUID
     var title: String
@@ -337,6 +417,8 @@ struct RequirementItem: Identifiable, Codable, Hashable {
     var maximumPages: Int?
     var maximumWords: Int?
     var requiredFileExtension: String?
+    var necessity: RequirementNecessity?
+    var requiredCount: Int?
 
     init(
         id: UUID = UUID(),
@@ -349,7 +431,9 @@ struct RequirementItem: Identifiable, Codable, Hashable {
         relatedDocumentType: DocumentType? = nil,
         maximumPages: Int? = nil,
         maximumWords: Int? = nil,
-        requiredFileExtension: String? = nil
+        requiredFileExtension: String? = nil,
+        necessity: RequirementNecessity = .required,
+        requiredCount: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -362,6 +446,12 @@ struct RequirementItem: Identifiable, Codable, Hashable {
         self.maximumPages = maximumPages
         self.maximumWords = maximumWords
         self.requiredFileExtension = requiredFileExtension
+        self.necessity = necessity
+        self.requiredCount = requiredCount
+    }
+
+    var effectiveNecessity: RequirementNecessity {
+        necessity ?? (status == .humanReview ? .conditional : .required)
     }
 }
 

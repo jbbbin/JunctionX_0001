@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F10000000000000000000001 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* AppState.swift */; };
+		F10000000000000000000001 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* AppViewModel.swift */; };
 		F10000000000000000000002 /* AuditEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* AuditEngine.swift */; };
 		F10000000000000000000003 /* AuditProgressSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* AuditProgressSheet.swift */; };
 		F10000000000000000000004 /* AuditReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000004 /* AuditReportView.swift */; };
@@ -25,7 +25,10 @@
 		F10000000000000000000010 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000010 /* RootView.swift */; };
 		F10000000000000000000011 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000011 /* SidebarView.swift */; };
 		F10000000000000000000012 /* WorkspaceHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000012 /* WorkspaceHeader.swift */; };
-		E10000000000000000000001 /* AppStateImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* AppStateImportTests.swift */; };
+		F10000000000000000000013 /* ApplicationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000013 /* ApplicationStore.swift */; };
+		F10000000000000000000014 /* AppDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000014 /* AppDependencies.swift */; };
+		F10000000000000000000015 /* NewWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000015 /* NewWorkspaceViewModel.swift */; };
+		E10000000000000000000001 /* AppViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* AppViewModelTests.swift */; };
 		E10000000000000000000002 /* AuditEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* AuditEngineTests.swift */; };
 		E10000000000000000000003 /* DocumentPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* DocumentPipelineTests.swift */; };
 		E10000000000000000000004 /* DocumentTypeInferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* DocumentTypeInferenceTests.swift */; };
@@ -44,7 +47,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		F20000000000000000000001 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		F20000000000000000000001 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		F20000000000000000000002 /* AuditEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditEngine.swift; sourceTree = "<group>"; };
 		F20000000000000000000003 /* AuditProgressSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditProgressSheet.swift; sourceTree = "<group>"; };
 		F20000000000000000000004 /* AuditReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportView.swift; sourceTree = "<group>"; };
@@ -62,7 +65,10 @@
 		F20000000000000000000010 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		F20000000000000000000011 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		F20000000000000000000012 /* WorkspaceHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceHeader.swift; sourceTree = "<group>"; };
-		E20000000000000000000001 /* AppStateImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateImportTests.swift; sourceTree = "<group>"; };
+		F20000000000000000000013 /* ApplicationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationStore.swift; sourceTree = "<group>"; };
+		F20000000000000000000014 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
+		F20000000000000000000015 /* NewWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewWorkspaceViewModel.swift; sourceTree = "<group>"; };
+		E20000000000000000000001 /* AppViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModelTests.swift; sourceTree = "<group>"; };
 		E20000000000000000000002 /* AuditEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditEngineTests.swift; sourceTree = "<group>"; };
 		E20000000000000000000003 /* DocumentPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPipelineTests.swift; sourceTree = "<group>"; };
 		E20000000000000000000004 /* DocumentTypeInferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTypeInferenceTests.swift; sourceTree = "<group>"; };
@@ -126,7 +132,9 @@
 		A30000000000000000000004 /* GradCheck */ = {
 			isa = PBXGroup;
 			children = (
-				F20000000000000000000001 /* AppState.swift */,
+				F20000000000000000000014 /* AppDependencies.swift */,
+				F20000000000000000000001 /* AppViewModel.swift */,
+				F20000000000000000000013 /* ApplicationStore.swift */,
 				F20000000000000000000002 /* AuditEngine.swift */,
 				F20000000000000000000003 /* AuditProgressSheet.swift */,
 				F20000000000000000000004 /* AuditReportView.swift */,
@@ -138,6 +146,7 @@
 				F2000000000000000000000A /* GradCheckApp.swift */,
 				F2000000000000000000000B /* Models.swift */,
 				F2000000000000000000000C /* NewWorkspaceSheet.swift */,
+				F20000000000000000000015 /* NewWorkspaceViewModel.swift */,
 				F2000000000000000000000D /* OverviewView.swift */,
 				F2000000000000000000000E /* RequirementExtractor.swift */,
 				F2000000000000000000000F /* RequirementsView.swift */,
@@ -168,7 +177,7 @@
 		E30000000000000000000002 /* GradCheckTests */ = {
 			isa = PBXGroup;
 			children = (
-				E20000000000000000000001 /* AppStateImportTests.swift */,
+				E20000000000000000000001 /* AppViewModelTests.swift */,
 				E20000000000000000000002 /* AuditEngineTests.swift */,
 				E20000000000000000000003 /* DocumentPipelineTests.swift */,
 				E20000000000000000000004 /* DocumentTypeInferenceTests.swift */,
@@ -276,7 +285,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F10000000000000000000001 /* AppState.swift in Sources */,
+				F10000000000000000000014 /* AppDependencies.swift in Sources */,
+				F10000000000000000000001 /* AppViewModel.swift in Sources */,
+				F10000000000000000000013 /* ApplicationStore.swift in Sources */,
 				F10000000000000000000002 /* AuditEngine.swift in Sources */,
 				F10000000000000000000003 /* AuditProgressSheet.swift in Sources */,
 				F10000000000000000000004 /* AuditReportView.swift in Sources */,
@@ -288,6 +299,7 @@
 				F1000000000000000000000A /* GradCheckApp.swift in Sources */,
 				F1000000000000000000000B /* Models.swift in Sources */,
 				F1000000000000000000000C /* NewWorkspaceSheet.swift in Sources */,
+				F10000000000000000000015 /* NewWorkspaceViewModel.swift in Sources */,
 				F1000000000000000000000D /* OverviewView.swift in Sources */,
 				F1000000000000000000000E /* RequirementExtractor.swift in Sources */,
 				F1000000000000000000000F /* RequirementsView.swift in Sources */,
@@ -301,7 +313,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E10000000000000000000001 /* AppStateImportTests.swift in Sources */,
+				E10000000000000000000001 /* AppViewModelTests.swift in Sources */,
 				E10000000000000000000002 /* AuditEngineTests.swift in Sources */,
 				E10000000000000000000003 /* DocumentPipelineTests.swift in Sources */,
 				E10000000000000000000004 /* DocumentTypeInferenceTests.swift in Sources */,

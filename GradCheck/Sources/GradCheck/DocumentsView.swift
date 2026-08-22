@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct DocumentsView: View {
-    @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var state: AppViewModel
     @State private var showImporter = false
     @State private var importTarget: DocumentType?
     @State private var isDropTargeted = false
@@ -16,7 +16,7 @@ struct DocumentsView: View {
                     SectionTitle(
                         "지원 서류",
                         eyebrow: "APPLICATION PACKAGE",
-                        subtitle: "핵심 문서 4종을 함께 읽고 이름, 학력, 날짜, 목표 프로그램을 대조합니다."
+                        subtitle: "이 지원서의 공식 모집요강에서 확인한 서류만 구성하고 서로 대조합니다."
                     )
                     Spacer()
                     Button {
@@ -27,13 +27,25 @@ struct DocumentsView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(GCTheme.brand)
-                    .disabled(state.isImporting)
+                    .disabled(state.isImporting || state.requiredDocumentTypes.isEmpty)
                 }
 
-                coreDocumentsCard
-                    .allowsHitTesting(!state.isImporting)
-                requirementsDocumentCard
-                    .allowsHitTesting(!state.isImporting)
+                requirementsSourceSummary
+
+                if state.requirements.isEmpty || state.requiredDocumentTypes.isEmpty {
+                    SurfaceCard {
+                        EmptyStateView(
+                            symbol: "building.columns",
+                            title: "먼저 모집요강을 확인해 주세요",
+                            message: "공식 모집요강을 분석한 뒤 학교·프로그램에 맞는 필요 서류 목록을 만듭니다.",
+                            actionTitle: "모집요강으로 이동",
+                            action: { state.destination = .requirements }
+                        )
+                    }
+                } else {
+                    requiredDocumentsCard
+                        .allowsHitTesting(!state.isImporting)
+                }
                 processingNote
             }
             .frame(maxWidth: 1000)
@@ -43,7 +55,7 @@ struct DocumentsView: View {
         .fileImporter(
             isPresented: $showImporter,
             allowedContentTypes: supportedTypes,
-            allowsMultipleSelection: importTarget == nil
+            allowsMultipleSelection: importTarget == nil || importTarget.map { state.requiredCount(for: $0) > 1 } == true
         ) { result in
             switch result {
             case .success(let urls): state.importDocuments(urls, as: importTarget)
@@ -52,12 +64,12 @@ struct DocumentsView: View {
         }
     }
 
-    private var coreDocumentsCard: some View {
+    private var requiredDocumentsCard: some View {
         SurfaceCard(padding: 0) {
             VStack(spacing: 0) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("핵심 검수 서류")
+                        Text("모집요강 기반 필요 서류")
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(GCTheme.ink)
                         Text("PDF, TXT, RTF 또는 이미지 · 파일별 최대 처리 시간은 네트워크 환경에 따라 달라집니다.")
@@ -65,12 +77,12 @@ struct DocumentsView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text("\(state.coreDocumentCount) / 4 준비")
+                    Text("\(state.readyDocumentCount) / \(state.requiredDocumentCount) 준비")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(state.coreDocumentCount == 4 ? ReviewStatus.ready.color : GCTheme.secondaryInk)
+                        .foregroundStyle(state.readyDocumentCount == state.requiredDocumentCount ? ReviewStatus.ready.color : GCTheme.secondaryInk)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background((state.coreDocumentCount == 4 ? ReviewStatus.ready.color : Color.secondary).opacity(0.08))
+                        .background((state.readyDocumentCount == state.requiredDocumentCount ? ReviewStatus.ready.color : Color.secondary).opacity(0.08))
                         .clipShape(Capsule())
                 }
                 .padding(20)
@@ -78,19 +90,16 @@ struct DocumentsView: View {
                 Divider()
 
                 VStack(spacing: 0) {
-                    ForEach(Array([DocumentType.cv, .sop, .transcript, .englishScore].enumerated()), id: \.element.id) { index, type in
+                    ForEach(Array(state.requiredDocumentTypes.enumerated()), id: \.element.id) { index, type in
                         DocumentSlotRow(
                             type: type,
-                            document: state.documents.first(where: { $0.type == type }),
+                            documents: state.documents.filter { $0.type == type },
+                            expectedCount: state.requiredCount(for: type),
                             replace: {
                                 importTarget = type
                                 showImporter = true
                             },
-                            remove: {
-                                if let document = state.documents.first(where: { $0.type == type }) {
-                                    state.removeDocument(document)
-                                }
-                            },
+                            remove: { state.removeDocument($0) },
                             sampleRevision: type == .sop && state.workspace.isSample
                                 ? { state.applyRevisedSampleSOP() }
                                 : nil,
@@ -98,7 +107,7 @@ struct DocumentsView: View {
                                 state.importDocuments(urls, as: type)
                             }
                         )
-                        if index < 3 { Divider().padding(.leading, 74) }
+                        if index < state.requiredDocumentTypes.count - 1 { Divider().padding(.leading, 74) }
                     }
                 }
 
@@ -108,7 +117,7 @@ struct DocumentsView: View {
         }
     }
 
-    private var requirementsDocumentCard: some View {
+    private var requirementsSourceSummary: some View {
         SurfaceCard(padding: 0) {
             VStack(spacing: 0) {
                 HStack(alignment: .center, spacing: 14) {
@@ -137,7 +146,7 @@ struct DocumentsView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if let document = state.documents.first(where: { $0.type == .requirements }) {
+                    if let document = state.requirementDocuments.first {
                         VStack(alignment: .trailing, spacing: 4) {
                             Label(document.filename, systemImage: document.processingStatus == .ready ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                                 .font(.system(size: 11, weight: .semibold))
@@ -149,11 +158,13 @@ struct DocumentsView: View {
                         }
                         .frame(maxWidth: 250, alignment: .trailing)
                     }
-                    Button(state.documents.contains(where: { $0.type == .requirements }) ? "교체" : "추가") {
-                        importTarget = .requirements
-                        showImporter = true
+                    if state.requirementDocuments.count > 1 {
+                        Text("외 \(state.requirementDocuments.count - 1)개")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.bordered)
+                    Button("요건 관리") { state.destination = .requirements }
+                        .buttonStyle(.bordered)
                 }
                 .padding(20)
             }
@@ -214,12 +225,16 @@ struct DocumentsView: View {
 
 private struct DocumentSlotRow: View {
     let type: DocumentType
-    let document: DocumentItem?
+    let documents: [DocumentItem]
+    let expectedCount: Int
     let replace: () -> Void
-    let remove: () -> Void
+    let remove: (DocumentItem) -> Void
     let sampleRevision: (() -> Void)?
     let dropped: ([URL]) -> Void
     @State private var targeted = false
+
+    private var document: DocumentItem? { documents.first }
+    private var readyCount: Int { documents.filter { $0.processingStatus == .ready }.count }
 
     var body: some View {
         HStack(spacing: 14) {
@@ -238,7 +253,7 @@ private struct DocumentSlotRow: View {
                     .foregroundStyle(GCTheme.ink)
                 if let document {
                     HStack(spacing: 7) {
-                        Text(document.filename)
+                        Text(documents.prefix(2).map(\.filename).joined(separator: ", "))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(GCTheme.secondaryInk)
                             .lineLimit(1)
@@ -253,9 +268,16 @@ private struct DocumentSlotRow: View {
                                 .font(.system(size: 8, weight: .bold))
                                 .foregroundStyle(GCTheme.blue)
                         }
+                        if expectedCount > 1 {
+                            Text("\(readyCount)/\(expectedCount)부")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(readyCount >= expectedCount ? ReviewStatus.ready.color : ReviewStatus.humanReview.color)
+                        }
                     }
                 } else {
-                    Text("파일을 추가하거나 이 행에 놓으세요")
+                    Text(expectedCount > 1
+                         ? "\(expectedCount)부를 추가하거나 이 행에 놓으세요"
+                         : "파일을 추가하거나 이 행에 놓으세요")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -264,13 +286,16 @@ private struct DocumentSlotRow: View {
             Spacer(minLength: 12)
 
             if let document {
-                processingStatus(document.processingStatus)
+                processingStatus(readyCount >= expectedCount ? .ready : document.processingStatus)
                 Menu {
-                    Button("파일 교체", action: replace)
+                    Button(expectedCount > 1 ? "파일 추가" : "파일 교체", action: replace)
                     if let sampleRevision, document.isSample {
                         Button("수정본 샘플 적용", action: sampleRevision)
                     }
-                    Button("목록에서 제거", role: .destructive, action: remove)
+                    Divider()
+                    ForEach(documents) { value in
+                        Button("\(value.filename) 제거", role: .destructive) { remove(value) }
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                         .frame(width: 28, height: 28)
@@ -288,7 +313,7 @@ private struct DocumentSlotRow: View {
         .background(targeted ? GCTheme.brandSoft.opacity(0.75) : .clear)
         .contentShape(Rectangle())
         .dropDestination(for: URL.self) { urls, _ in
-            dropped(Array(urls.prefix(1)))
+            dropped(expectedCount > 1 ? urls : Array(urls.prefix(1)))
             return !urls.isEmpty
         } isTargeted: { targeted = $0 }
     }

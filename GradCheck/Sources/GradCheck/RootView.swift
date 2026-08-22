@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct RootView: View {
-    @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var state: AppViewModel
 
     var body: some View {
         NavigationSplitView {
@@ -26,8 +26,7 @@ struct RootView: View {
             )
         }
         .sheet(isPresented: $state.showNewWorkspace) {
-            NewWorkspaceSheet()
-                .environmentObject(state)
+            NewWorkspaceSheet(appViewModel: state)
         }
         .sheet(isPresented: $state.isAuditing) {
             AuditProgressSheet()

@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct RequirementsView: View {
-    @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var state: AppViewModel
     @State private var showImporter = false
 
     var body: some View {
@@ -18,7 +18,7 @@ struct RequirementsView: View {
                     Button {
                         showImporter = true
                     } label: {
-                        Label(sourceDocument == nil ? "모집요강 추가" : "모집요강 교체", systemImage: "doc.badge.plus")
+                        Label("모집요강 추가", systemImage: "doc.badge.plus")
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(GCTheme.brand)
@@ -53,7 +53,7 @@ struct RequirementsView: View {
         .fileImporter(
             isPresented: $showImporter,
             allowedContentTypes: [.pdf, .plainText, .image],
-            allowsMultipleSelection: false
+            allowsMultipleSelection: true
         ) { result in
             switch result {
             case .success(let urls): state.importDocuments(urls, as: .requirements)
@@ -62,57 +62,64 @@ struct RequirementsView: View {
         }
     }
 
-    private var sourceDocument: DocumentItem? {
-        state.documents.first { $0.type == .requirements }
-    }
-
     private var sourceCard: some View {
-        SurfaceCard {
-            HStack(spacing: 15) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(sourceDocument == nil ? Color.black.opacity(0.045) : GCTheme.brandSoft)
-                    Image(systemName: sourceDocumentSymbol)
+        SurfaceCard(padding: 0) {
+            if state.requirementDocuments.isEmpty {
+                HStack(spacing: 15) {
+                    Image(systemName: "doc.badge.plus")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(sourceDocumentColor)
-                }
-                .frame(width: 49, height: 49)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(sourceDocument?.filename ?? "공식 출처 문서가 필요합니다")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(GCTheme.ink)
-                    if let sourceDocument {
-                        HStack(spacing: 8) {
-                            Text(sourceDocument.metadata)
-                            Text("·")
-                            Text(sourceDocument.isSample ? "합성 데모 출처" : state.providerLabel)
-                        }
-                        .font(.system(size: 10))
                         .foregroundStyle(.secondary)
-                    } else {
+                        .frame(width: 49, height: 49)
+                        .background(Color.black.opacity(0.045))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("공식 출처 문서가 필요합니다")
+                            .font(.system(size: 14, weight: .bold))
                         Text("대학원 또는 학과가 제공한 공식 PDF를 등록하세요.")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
+                    Spacer()
                 }
-                Spacer()
-                if let sourceDocument {
-                    Label(sourceDocument.processingStatus.label, systemImage: sourceDocument.processingStatus == .ready ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(sourceDocument.processingStatus == .ready ? ReviewStatus.ready.color : ReviewStatus.humanReview.color)
+                .padding(18)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(state.requirementDocuments.enumerated()), id: \.element.id) { index, document in
+                        HStack(spacing: 15) {
+                            Image(systemName: document.processingStatus == .ready ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(document.processingStatus == .ready ? GCTheme.brand : ReviewStatus.humanReview.color)
+                                .frame(width: 42, height: 42)
+                                .background(GCTheme.brandSoft)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(document.filename)
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text([document.metadata, document.isSample ? "합성 데모 출처" : state.providerLabel]
+                                    .filter { !$0.isEmpty }
+                                    .joined(separator: " · "))
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Label(document.processingStatus.label, systemImage: "checkmark.circle.fill")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(ReviewStatus.ready.color)
+                            Button {
+                                state.removeDocument(document)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(state.isImporting)
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 14)
+                        if index < state.requirementDocuments.count - 1 { Divider().padding(.leading, 74) }
+                    }
                 }
             }
         }
-    }
-
-    private var sourceDocumentColor: Color {
-        guard let sourceDocument else { return .secondary }
-        return sourceDocument.processingStatus == .ready ? GCTheme.brand : ReviewStatus.humanReview.color
-    }
-
-    private var sourceDocumentSymbol: String {
-        guard let sourceDocument else { return "doc.badge.plus" }
-        return sourceDocument.processingStatus == .ready ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"
     }
 
     private func requirementGroup(_ scope: RequirementScope) -> some View {

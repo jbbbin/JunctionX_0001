@@ -47,22 +47,58 @@ enum DocumentPipelineError: LocalizedError {
     }
 }
 
-struct DocumentPipeline {
-    private let upstage: UpstageDocumentService?
+protocol DocumentAnalyzing: Sendable {
+    var providerLabel: String { get }
+    var isUpstageConnected: Bool { get }
+    func extract(from url: URL) async throws -> ExtractedDocument
+}
+
+protocol DocumentModelService: Sendable {
+    var providerName: String { get }
+    func supports(contentType: UTType?, fileExtension: String) -> Bool
+    func parse(url: URL) async throws -> ExtractedDocument
+}
+
+struct UpstageModelConfiguration: Sendable {
+    var model: String
+    var endpoint: URL
+    var timeout: TimeInterval
+
+    static let documentParse = UpstageModelConfiguration(
+        model: "document-parse",
+        endpoint: URL(string: "https://api.upstage.ai/v1/document-digitization")!,
+        timeout: 90
+    )
+}
+
+struct DocumentPipeline: DocumentAnalyzing {
+    private let modelServices: [any DocumentModelService]
 
     init(environment: [String: String] = ProcessInfo.processInfo.environment) {
         if let key = environment["UPSTAGE_API_KEY"], !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            upstage = UpstageDocumentService(apiKey: key)
+            let defaultConfiguration = UpstageModelConfiguration.documentParse
+            let configuration = UpstageModelConfiguration(
+                model: environment["UPSTAGE_DOCUMENT_MODEL"] ?? defaultConfiguration.model,
+                endpoint: environment["UPSTAGE_DOCUMENT_ENDPOINT"].flatMap(URL.init(string:)) ?? defaultConfiguration.endpoint,
+                timeout: environment["UPSTAGE_DOCUMENT_TIMEOUT"].flatMap(TimeInterval.init) ?? defaultConfiguration.timeout
+            )
+            modelServices = [UpstageDocumentService(apiKey: key, configuration: configuration)]
         } else {
-            upstage = nil
+            modelServices = []
         }
     }
 
-    var providerLabel: String {
-        upstage == nil ? "온디바이스 분석" : "Upstage Document Parse 연결됨"
+    init(modelServices: [any DocumentModelService]) {
+        self.modelServices = modelServices
     }
 
-    var isUpstageConnected: Bool { upstage != nil }
+    var providerLabel: String {
+        modelServices.first.map { "\($0.providerName) 연결됨" } ?? "온디바이스 분석"
+    }
+
+    var isUpstageConnected: Bool {
+        modelServices.contains { $0.providerName.localizedCaseInsensitiveContains("Upstage") }
+    }
 
     func extract(from url: URL) async throws -> ExtractedDocument {
         let values = try? url.resourceValues(forKeys: [.contentTypeKey, .fileSizeKey])
@@ -71,21 +107,28 @@ struct DocumentPipeline {
             throw DocumentPipelineError.fileTooLarge
         }
 
-        if let upstage, contentType?.conforms(to: .pdf) == true || contentType?.conforms(to: .image) == true {
+        let fileExtension = url.pathExtension.lowercased()
+        var modelError: Error?
+        for service in modelServices where service.supports(contentType: contentType, fileExtension: fileExtension) {
             do {
-                return try await upstage.parse(url: url)
+                return try await service.parse(url: url)
             } catch {
-                // A local text layer is a safe fallback for PDFs. Images still surface the API error.
-                if contentType?.conforms(to: .pdf) != true { throw error }
+                modelError = error
             }
         }
 
         if contentType?.conforms(to: .pdf) == true || url.pathExtension.lowercased() == "pdf" {
-            guard let document = PDFDocument(url: url) else { throw DocumentPipelineError.unreadableFile }
+            guard let document = PDFDocument(url: url) else {
+                if let modelError { throw modelError }
+                throw DocumentPipelineError.unreadableFile
+            }
             let pages = (0..<document.pageCount).map { index in
                 document.page(at: index)?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             }
-            guard pages.contains(where: { !$0.isEmpty }) else { throw DocumentPipelineError.missingParsedContent }
+            guard pages.contains(where: { !$0.isEmpty }) else {
+                if let modelError { throw modelError }
+                throw DocumentPipelineError.missingParsedContent
+            }
             return ExtractedDocument(pages: pages, provider: "PDFKit · 온디바이스")
         }
 
@@ -106,13 +149,28 @@ struct DocumentPipeline {
             return ExtractedDocument(pages: [value], provider: "RTF · 온디바이스")
         }
 
+        if let modelError { throw modelError }
         throw DocumentPipelineError.unsupportedFileType
     }
 }
 
-struct UpstageDocumentService {
+struct UpstageDocumentService: DocumentModelService {
     let apiKey: String
-    let endpoint = URL(string: "https://api.upstage.ai/v1/document-digitization")!
+    let configuration: UpstageModelConfiguration
+
+    init(apiKey: String, configuration: UpstageModelConfiguration = .documentParse) {
+        self.apiKey = apiKey
+        self.configuration = configuration
+    }
+
+    var providerName: String { "Upstage \(configuration.model)" }
+
+    func supports(contentType: UTType?, fileExtension: String) -> Bool {
+        contentType?.conforms(to: .pdf) == true
+            || contentType?.conforms(to: .image) == true
+            || fileExtension == "pdf"
+            || ["png", "jpg", "jpeg", "heic", "tiff"].contains(fileExtension)
+    }
 
     func parse(url: URL) async throws -> ExtractedDocument {
         let boundary = "GradCheck-\(UUID().uuidString)"
@@ -123,14 +181,14 @@ struct UpstageDocumentService {
             throw DocumentPipelineError.unreadableFile
         }
 
-        var request = URLRequest(url: endpoint)
+        var request = URLRequest(url: configuration.endpoint)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 90
+        request.timeoutInterval = configuration.timeout
 
         var body = Data()
-        body.appendFormField(name: "model", value: "document-parse", boundary: boundary)
+        body.appendFormField(name: "model", value: configuration.model, boundary: boundary)
         body.appendFormField(name: "ocr", value: "auto", boundary: boundary)
         body.appendFormField(name: "output_formats", value: #"["text", "markdown"]"#, boundary: boundary)
         body.appendFile(

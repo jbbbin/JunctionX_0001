@@ -158,8 +158,8 @@ enum DemoData {
         AuditFinding(
             status: .ready,
             category: .completeness,
-            title: "우선 검수 서류 4종이 모두 준비됐어요",
-            summary: "CV, SOP, 성적표, 공인영어성적 파일을 모두 확인했습니다.",
+            title: "기본 대조 서류 4종이 준비됐어요",
+            summary: "CV, SOP, 성적표, 공인영어성적 파일을 확인했습니다. 조건부 제출 항목은 별도로 확인해야 합니다.",
             action: "각 문서의 세부 검수 결과를 이어서 확인하세요.",
             evidences: [
                 EvidenceRef(
@@ -237,6 +237,16 @@ enum DemoData {
             page: 2
         ),
         RequirementItem(
+            title: "CV / Resume",
+            detail: "학력과 연구 경험을 포함한 최신 영문 CV 1부",
+            scope: .program,
+            status: .ready,
+            sourceName: "MIT_EECS_Admissions_2027.pdf",
+            page: 4,
+            relatedDocumentType: .cv,
+            requiredFileExtension: "pdf"
+        ),
+        RequirementItem(
             title: "Statement of Objectives",
             detail: "연구 관심사와 지원 동기를 포함한 영문 에세이 1부",
             scope: .program,
@@ -254,7 +264,10 @@ enum DemoData {
             scope: .program,
             status: .humanReview,
             sourceName: "MIT_EECS_Admissions_2027.pdf",
-            page: 5
+            page: 5,
+            relatedDocumentType: .recommendation,
+            necessity: .conditional,
+            requiredCount: 3
         ),
         RequirementItem(
             title: "공식 성적표",
@@ -274,7 +287,8 @@ enum DemoData {
             sourceName: "MIT_EECS_Admissions_2027.pdf",
             page: 6,
             relatedDocumentType: .englishScore,
-            requiredFileExtension: "pdf"
+            requiredFileExtension: "pdf",
+            necessity: .conditional
         ),
         RequirementItem(
             title: "GRE",
@@ -282,7 +296,9 @@ enum DemoData {
             scope: .program,
             status: .humanReview,
             sourceName: "MIT_EECS_Admissions_2027.pdf",
-            page: 7
+            page: 7,
+            relatedDocumentType: .greScore,
+            necessity: .conditional
         )
     ]
 
@@ -356,7 +372,8 @@ enum DemoData {
                     "GRE policy: verify the current program guidance.",
                     "Application deadline and final notes."
                 ]
-            case .other:
+            case .recommendation, .greScore, .writingSample, .portfolio,
+                 .researchProposal, .degreeCertificate, .passportVisa, .other:
                 pages = []
             }
             if !pages.isEmpty {
