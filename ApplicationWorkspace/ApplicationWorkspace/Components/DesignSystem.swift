@@ -1,11 +1,13 @@
 import SwiftUI
 
 extension Color {
-    static let awAccent = Color(red: 0.33, green: 0.30, blue: 0.96)
-    static let awAccentSoft = Color(red: 0.91, green: 0.90, blue: 1.00)
-    static let awSurface = Color(nsColor: .controlBackgroundColor)
-    static let awCanvas = Color(nsColor: .windowBackgroundColor)
-    static let awSecondaryText = Color(nsColor: .secondaryLabelColor)
+    static let awAccent = Color(red: 0.05, green: 0.51, blue: 0.96)
+    static let awAccentSoft = Color(red: 0.88, green: 0.94, blue: 1.00)
+    static let awSurface = Color.white
+    static let awCanvas = Color(red: 0.965, green: 0.970, blue: 0.980)
+    static let awSidebar = Color(red: 0.975, green: 0.978, blue: 0.984)
+    static let awBorder = Color(red: 0.88, green: 0.90, blue: 0.93)
+    static let awSecondaryText = Color(red: 0.40, green: 0.42, blue: 0.47)
 }
 
 struct SectionCard<Content: View>: View {
@@ -21,11 +23,11 @@ struct SectionCard<Content: View>: View {
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.awSurface)
-                    .shadow(color: .black.opacity(0.04), radius: 12, y: 5)
+                    .shadow(color: .black.opacity(0.035), radius: 12, y: 5)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.primary.opacity(0.07), lineWidth: 1)
+                    .stroke(Color.awBorder.opacity(0.72), lineWidth: 1)
             )
     }
 }

@@ -8,9 +8,10 @@ struct ApplicationWorkspaceApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(store)
-                .frame(minWidth: 1080, minHeight: 720)
+                .preferredColorScheme(.light)
+                .frame(minWidth: 1120, minHeight: 760)
         }
-        .windowStyle(.titleBar)
-        .defaultSize(width: 1280, height: 820)
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1380, height: 900)
     }
 }

@@ -3,8 +3,12 @@ import SwiftUI
 
 enum SidebarRoute: Hashable {
     case dashboard
+    case applications
     case profile
     case documents
+    case archive
+    case urgent
+    case needsReview
     case application(UUID)
 }
 
@@ -260,6 +264,7 @@ enum DashboardStatusFilter: String, CaseIterable, Identifiable {
     case all = "전체"
     case preparing = "준비 중"
     case urgent = "마감 임박"
+    case needsReview = "확인 필요"
     case completed = "완료"
 
     var id: String { rawValue }

@@ -25,7 +25,7 @@ struct AddApplicationView: View {
 
         var subtitle: String {
             switch self {
-            case .waiting: "PDF 한 번만 올리면 나머지는 자동으로 진행돼요."
+            case .waiting: "모집요강 한 번만 올리면 나머지는 자동으로 진행돼요."
             case .uploading: "Firebase Storage에 원본을 저장하고 있어요."
             case .classifying: "채용·장학금·공모전 중 알맞은 분야를 찾고 있어요."
             case .extracting: "Upstage Studio가 마감일과 요구사항을 구조화하고 있어요."
@@ -57,6 +57,15 @@ struct AddApplicationView: View {
 
     let onCompleted: (UUID) -> Void
 
+    init(
+        initialFilename: String? = nil,
+        onCompleted: @escaping (UUID) -> Void
+    ) {
+        _selectedFilename = State(initialValue: initialFilename)
+        _phase = State(initialValue: initialFilename == nil ? .waiting : .uploading)
+        self.onCompleted = onCompleted
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -76,12 +85,17 @@ struct AddApplicationView: View {
         .background(Color.awCanvas)
         .fileImporter(
             isPresented: $isShowingImporter,
-            allowedContentTypes: [.pdf],
+            allowedContentTypes: [.pdf, .image],
             allowsMultipleSelection: false
         ) { result in
             guard case let .success(urls) = result, let url = urls.first else { return }
             selectedFilename = url.lastPathComponent
             beginAnalysis()
+        }
+        .onAppear {
+            if selectedFilename != nil, phase == .uploading, analysisTask == nil {
+                beginAnalysis()
+            }
         }
         .onDisappear {
             analysisTask?.cancel()
@@ -133,7 +147,7 @@ struct AddApplicationView: View {
             Button {
                 isShowingImporter = true
             } label: {
-                Label("PDF 모집요강 선택", systemImage: "folder")
+                Label("모집요강 파일 선택", systemImage: "folder")
             }
             .buttonStyle(PrimaryButtonStyle())
 
@@ -161,7 +175,7 @@ struct AddApplicationView: View {
                         Text(filename)
                             .font(.headline)
                             .lineLimit(1)
-                        Text("PDF 모집요강")
+                        Text("모집요강 파일")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
