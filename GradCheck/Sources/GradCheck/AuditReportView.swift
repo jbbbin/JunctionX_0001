@@ -59,6 +59,7 @@ struct AuditReportView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(GCTheme.canvas)
     }
 
