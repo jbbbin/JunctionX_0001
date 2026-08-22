@@ -1,7 +1,8 @@
 .DS_Store
 .build/
+.xcode-derived/
+.xcode-derived-signed/
 .swiftpm/
 DerivedData/
 xcuserdata/
 *.xcuserstate
-

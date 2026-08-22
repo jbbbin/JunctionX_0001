@@ -8,10 +8,18 @@ GradCheck는 미국 대학원 지원을 준비하는 한국인 사용자를 위�
 
 ## 실행
 
-1. Xcode 26 이상에서 `Package.swift`를 엽니다.
+1. Xcode 26 이상에서 `GradCheck.xcodeproj`를 엽니다.
 2. `GradCheck` 실행 스킴과 **My Mac**을 선택해 실행합니다.
 
-터미널에서는 다음 명령으로 빌드와 테스트를 실행할 수 있습니다.
+공유 Scheme에는 macOS 앱 타깃과 `GradCheckTests` 테스트 타깃이 포함되어 있습니다. `Package.swift`도 CLI와 CI 호환성을 위해 함께 유지합니다.
+
+터미널에서는 다음 명령으로 Xcode 프로젝트를 검증할 수 있습니다.
+
+```sh
+xcodebuild -project GradCheck.xcodeproj -scheme GradCheck -destination 'platform=macOS' test
+```
+
+Swift Package 명령도 계속 사용할 수 있습니다.
 
 ```sh
 swift build
