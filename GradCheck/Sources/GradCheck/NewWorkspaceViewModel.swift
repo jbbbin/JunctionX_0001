@@ -22,6 +22,7 @@ final class NewWorkspaceViewModel: ObservableObject {
     @Published var degree = "PhD"
     @Published var intake = "Fall 2027"
     @Published var applicantName = ""
+    @Published var upstageAPIKey = ""
     @Published private(set) var requirementURLs: [URL] = []
     @Published private(set) var analysis: RequirementAnalysisResult?
     @Published private(set) var isAnalyzing = false
@@ -39,7 +40,12 @@ final class NewWorkspaceViewModel: ObservableObject {
         return !draft.school.isEmpty && !draft.program.isEmpty && !draft.intake.isEmpty
     }
 
-    var canAnalyze: Bool { !requirementURLs.isEmpty && !isAnalyzing }
+    var hasUpstageAPIKey: Bool { app.hasStoredUpstageAPIKey }
+    var canAnalyze: Bool {
+        !requirementURLs.isEmpty
+            && (!upstageAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hasUpstageAPIKey)
+            && !isAnalyzing
+    }
     var canCreate: Bool { analysis?.requiredDocumentTypes.isEmpty == false && !isAnalyzing }
     var providerLabel: String { app.providerLabel }
     var isUpstageConnected: Bool { app.isUpstageConnected }
@@ -86,6 +92,11 @@ final class NewWorkspaceViewModel: ObservableObject {
                 self.analysisTask = nil
             }
             do {
+                let key = self.upstageAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !key.isEmpty {
+                    try self.app.saveUpstageAPIKey(key)
+                    self.upstageAPIKey = ""
+                }
                 self.analysis = try await self.app.analyzeRequirements(urls)
                 self.step = .review
             } catch is CancellationError {

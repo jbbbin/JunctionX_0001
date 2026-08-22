@@ -20,6 +20,8 @@ extension AuditEngine: ApplicationAuditing {}
 struct AppDependencies {
     var documentAnalyzer: any DocumentAnalyzing
     var requirementsAnalyzer: any RequirementsAnalyzing
+    var graduateRequirementsAnalyzer: any GraduateRequirementsAnalyzing = UnavailableGraduateRequirementsAnalyzer()
+    var apiKeyStore: any UpstageAPIKeyStoring = EnvironmentThenKeychainAPIKeyStore()
     var auditor: any ApplicationAuditing
     var repository: any ApplicationRepository
 
@@ -27,9 +29,15 @@ struct AppDependencies {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         loadSavedState: Bool = true
     ) -> AppDependencies {
-        AppDependencies(
+        let apiKeyStore = EnvironmentThenKeychainAPIKeyStore(environment: environment)
+        return AppDependencies(
             documentAnalyzer: DocumentPipeline(environment: environment),
             requirementsAnalyzer: RequirementExtractor(),
+            graduateRequirementsAnalyzer: StudioAgentRequirementsService(
+                purpose: .graduateRequirements,
+                apiKeyStore: apiKeyStore
+            ),
+            apiKeyStore: apiKeyStore,
             auditor: AuditEngine(),
             repository: loadSavedState
                 ? UserDefaultsApplicationRepository()

@@ -27,7 +27,7 @@ struct NewWorkspaceSheet: View {
         .background(GCTheme.canvas)
         .fileImporter(
             isPresented: $showImporter,
-            allowedContentTypes: [.pdf, .plainText, .rtf, .image],
+            allowedContentTypes: [.pdf],
             allowsMultipleSelection: true
         ) { result in
             switch result {
@@ -159,7 +159,7 @@ struct NewWorkspaceSheet: View {
                     EmptyStateView(
                         symbol: "doc.text.magnifyingglass",
                         title: "아직 모집요강이 없어요",
-                        message: "PDF, 이미지, TXT, RTF 파일을 여러 개 선택할 수 있습니다.",
+                        message: "대학원 공통 안내와 프로그램 안내 PDF를 여러 개 선택할 수 있습니다.",
                         actionTitle: "모집요강 선택",
                         action: { showImporter = true }
                     )
@@ -195,6 +195,28 @@ struct NewWorkspaceSheet: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Upstage API Key")
+                        .font(.system(size: 12, weight: .bold))
+                    Spacer()
+                    if model.hasUpstageAPIKey {
+                        Label("이 Mac에 저장됨", systemImage: "key.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(ReviewStatus.ready.color)
+                    }
+                }
+                SecureField("up_...", text: $model.upstageAPIKey)
+                    .textFieldStyle(.roundedBorder)
+                Text(model.hasUpstageAPIKey
+                     ? "새 키를 입력하면 기존 키를 교체합니다. 입력하지 않으면 저장된 키를 사용합니다."
+                     : "입력한 키는 프로젝트 파일이 아니라 이 Mac의 Keychain에 저장됩니다.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(14)
+            .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
             HStack(alignment: .top, spacing: 11) {
                 Image(systemName: model.isUpstageConnected ? "network.badge.shield.half.filled" : "lock.macwindow")
                     .foregroundStyle(GCTheme.brand)
@@ -202,8 +224,8 @@ struct NewWorkspaceSheet: View {
                     Text(model.providerLabel)
                         .font(.system(size: 11, weight: .semibold))
                     Text(model.isUpstageConnected
-                         ? "Upstage 모델로 문서 구조를 분석합니다. 모델명과 엔드포인트는 환경 설정으로 교체할 수 있습니다."
-                         : "현재는 이 Mac의 텍스트 추출을 사용합니다. UPSTAGE_API_KEY를 설정하면 이미지·PDF 분석이 확장됩니다.")
+                         ? "네 Upstage Studio 모집요강 Agent가 PDF를 Parse · Classify · Extract합니다."
+                         : "Agent를 실행하려면 up_로 시작하는 Upstage API 키를 입력해 주세요.")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }

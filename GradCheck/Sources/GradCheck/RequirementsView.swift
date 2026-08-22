@@ -52,7 +52,7 @@ struct RequirementsView: View {
         }
         .fileImporter(
             isPresented: $showImporter,
-            allowedContentTypes: [.pdf, .plainText, .image],
+            allowedContentTypes: [.pdf],
             allowsMultipleSelection: true
         ) { result in
             switch result {

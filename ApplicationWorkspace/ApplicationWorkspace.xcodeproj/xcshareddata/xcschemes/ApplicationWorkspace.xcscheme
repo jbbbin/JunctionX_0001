@@ -42,6 +42,15 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "A40000000000000000000002"
+            BuildableName = "ApplicationWorkspace.app"
+            BlueprintName = "ApplicationWorkspace"
+            ReferencedContainer = "container:ApplicationWorkspace.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
       <Testables>
          <TestableReference
             skipped = "NO"
@@ -55,15 +64,6 @@
             </BuildableReference>
          </TestableReference>
       </Testables>
-      <MacroExpansion>
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A40000000000000000000002"
-            BuildableName = "ApplicationWorkspace.app"
-            BlueprintName = "ApplicationWorkspace"
-            ReferencedContainer = "container:ApplicationWorkspace.xcodeproj">
-         </BuildableReference>
-      </MacroExpansion>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

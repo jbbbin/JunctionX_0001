@@ -45,6 +45,7 @@ struct DocumentsView: View {
                 } else {
                     requiredDocumentsCard
                         .allowsHitTesting(!state.isImporting)
+                    extractedChecklistCard
                 }
                 processingNote
             }
@@ -171,6 +172,61 @@ struct DocumentsView: View {
         }
     }
 
+    /// Keeps every Agent-extracted requirement visible beside the upload slots.
+    /// Some requirements (for example an online form or an application fee) do
+    /// not have a user-uploadable file type, but still belong in the checklist.
+    private var extractedChecklistCard: some View {
+        let values = state.requirements.filter { $0.effectiveNecessity != .informational }
+        return SurfaceCard(padding: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("모집요강에서 추출한 전체 체크리스트")
+                            .font(.system(size: 15, weight: .bold))
+                        Text("파일 업로드가 필요 없는 지원서·수수료 등도 함께 확인하세요.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text("\(values.count)개")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(GCTheme.brand)
+                }
+                .padding(20)
+
+                Divider()
+
+                ForEach(Array(values.enumerated()), id: \.element.id) { index, requirement in
+                    HStack(alignment: .top, spacing: 11) {
+                        Image(systemName: requirement.effectiveNecessity == .conditional ? "exclamationmark.circle.fill" : "checkmark.circle")
+                            .foregroundStyle(requirement.effectiveNecessity == .conditional ? ReviewStatus.humanReview.color : GCTheme.brand)
+                            .padding(.top, 1)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 7) {
+                                Text(requirement.title)
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(requirement.effectiveNecessity.rawValue)
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(requirement.effectiveNecessity == .conditional ? ReviewStatus.humanReview.color : ReviewStatus.ready.color)
+                            }
+                            Text(requirement.detail)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(requirement.page.map { "\(requirement.sourceName) · p.\($0)" } ?? requirement.sourceName)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(GCTheme.secondaryInk)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 13)
+                    if index < values.count - 1 { Divider().padding(.leading, 48) }
+                }
+            }
+        }
+    }
+
     private var dropZone: some View {
         HStack(spacing: 11) {
             Image(systemName: "arrow.down.doc")
@@ -211,8 +267,8 @@ struct DocumentsView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(GCTheme.ink)
                 Text(state.isUpstageConnected
-                     ? "가져온 PDF와 이미지는 Upstage Document Parse로 구조화합니다. API 키와 원문 텍스트는 앱 상태에 저장하지 않습니다."
-                     : "텍스트 레이어가 있는 PDF와 텍스트 문서는 이 Mac에서 읽습니다. 스캔 이미지 분석은 UPSTAGE_API_KEY를 설정하면 활성화됩니다.")
+                     ? "모집요강은 Upstage Studio Agent가 구조화하고, 지원자 서류는 제출 목록과 대조합니다. API 키는 이 Mac의 Keychain에만 저장됩니다."
+                     : "모집요강 Agent를 실행하려면 새 지원 목표 단계에서 up_로 시작하는 Upstage API 키를 입력해 주세요.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

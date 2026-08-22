@@ -15,6 +15,8 @@ final class AppViewModel: ObservableObject {
 
     private let documentAnalyzer: any DocumentAnalyzing
     private let requirementsAnalyzer: any RequirementsAnalyzing
+    private let graduateRequirementsAnalyzer: any GraduateRequirementsAnalyzing
+    private let apiKeyStore: any UpstageAPIKeyStoring
     private let auditor: any ApplicationAuditing
     private let repository: any ApplicationRepository
     private var importTask: Task<Void, Never>?
@@ -32,6 +34,8 @@ final class AppViewModel: ObservableObject {
     init(dependencies: AppDependencies) {
         documentAnalyzer = dependencies.documentAnalyzer
         requirementsAnalyzer = dependencies.requirementsAnalyzer
+        graduateRequirementsAnalyzer = dependencies.graduateRequirementsAnalyzer
+        apiKeyStore = dependencies.apiKeyStore
         auditor = dependencies.auditor
         repository = dependencies.repository
 
@@ -60,8 +64,9 @@ final class AppViewModel: ObservableObject {
     var requiredDocumentCount: Int { selectedSession.requiredDocumentCount }
     var readyDocumentCount: Int { selectedSession.readyDocumentCount }
 
-    var providerLabel: String { documentAnalyzer.providerLabel }
-    var isUpstageConnected: Bool { documentAnalyzer.isUpstageConnected }
+    var providerLabel: String { graduateRequirementsAnalyzer.providerLabel }
+    var isUpstageConnected: Bool { graduateRequirementsAnalyzer.hasAPIKey }
+    var hasStoredUpstageAPIKey: Bool { graduateRequirementsAnalyzer.hasAPIKey }
     var hasCurrentAudit: Bool {
         workspace.status != .preparing && !findings.isEmpty && workspace.lastAuditedAt != nil
     }
@@ -101,11 +106,25 @@ final class AppViewModel: ObservableObject {
         persist()
     }
 
+    func saveUpstageAPIKey(_ value: String) throws {
+        try apiKeyStore.saveAPIKey(value)
+        objectWillChange.send()
+    }
+
+    func removeUpstageAPIKey() throws {
+        try apiKeyStore.removeAPIKey()
+        objectWillChange.send()
+    }
+
     func analyzeRequirements(_ urls: [URL]) async throws -> RequirementAnalysisResult {
         guard !urls.isEmpty else { throw WorkspaceFlowError.requirementsMissing }
 
+        // The Studio Agent is the source of truth for requirement extraction.
+        // The local pipeline below is retained only for PDF page count/preview
+        // and later document-to-requirement evidence checks.
+        let agentRequirements = try await graduateRequirementsAnalyzer.analyze(urls: urls)
+
         var documents: [DocumentItem] = []
-        var requirements: [RequirementItem] = []
         var extractions: [UUID: ExtractedDocument] = [:]
 
         for url in urls {
@@ -113,7 +132,15 @@ final class AppViewModel: ObservableObject {
             let hasAccess = url.startAccessingSecurityScopedResource()
             defer { if hasAccess { url.stopAccessingSecurityScopedResource() } }
 
-            let extraction = try await documentAnalyzer.extract(from: url)
+            let extraction: ExtractedDocument
+            do {
+                extraction = try await documentAnalyzer.extract(from: url)
+            } catch {
+                // The Studio Agent has already read this PDF. A scan without a
+                // local PDF text layer must not prevent its extracted checklist
+                // from proceeding to the support-document preparation screen.
+                extraction = agentBackedExtraction(for: url)
+            }
             let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
             let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
             let document = DocumentItem(
@@ -125,19 +152,14 @@ final class AppViewModel: ObservableObject {
                 isSample: false
             )
             documents.removeAll { sameFilename($0.filename, document.filename) }
-            requirements.removeAll { sameFilename($0.sourceName, document.filename) }
             documents.append(document)
             extractions[document.id] = extraction
-            requirements.append(contentsOf: requirementsAnalyzer.extract(
-                from: extraction,
-                sourceName: document.filename
-            ))
         }
 
-        guard !requirements.isEmpty else { throw WorkspaceFlowError.noRequirementsExtracted }
+        guard !agentRequirements.isEmpty else { throw WorkspaceFlowError.noRequirementsExtracted }
         return RequirementAnalysisResult(
             documents: documents,
-            requirements: requirements,
+            requirements: agentRequirements,
             extractions: extractions
         )
     }
@@ -239,7 +261,18 @@ final class AppViewModel: ObservableObject {
                 self.updateSession(id: workspaceID) { $0.documents.append(item) }
 
                 do {
-                    let extraction = try await self.documentAnalyzer.extract(from: url)
+                    var agentRequirements: [RequirementItem]?
+                    if provisionalType == .requirements, self.graduateRequirementsAnalyzer.hasAPIKey {
+                        agentRequirements = try await self.graduateRequirementsAnalyzer.analyze(urls: [url])
+                    }
+
+                    let extraction: ExtractedDocument
+                    do {
+                        extraction = try await self.documentAnalyzer.extract(from: url)
+                    } catch {
+                        guard agentRequirements != nil else { throw error }
+                        extraction = self.agentBackedExtraction(for: url)
+                    }
                     guard !Task.isCancelled,
                           self.selectedWorkspaceID == workspaceID,
                           self.activeImportID == importID else { return }
@@ -247,11 +280,17 @@ final class AppViewModel: ObservableObject {
                         from: item.filename,
                         content: extraction.text
                     )
+                    if finalType == .requirements,
+                       agentRequirements == nil,
+                       self.graduateRequirementsAnalyzer.hasAPIKey {
+                        agentRequirements = try await self.graduateRequirementsAnalyzer.analyze(urls: [url])
+                    }
                     self.commitImportedDocument(
                         item.id,
                         workspaceID: workspaceID,
                         as: finalType,
-                        extraction: extraction
+                        extraction: extraction,
+                        requirements: agentRequirements
                     )
                     importedTypes.append(finalType)
                 } catch {
@@ -431,7 +470,8 @@ final class AppViewModel: ObservableObject {
         _ id: UUID,
         workspaceID: UUID,
         as type: DocumentType,
-        extraction: ExtractedDocument
+        extraction: ExtractedDocument,
+        requirements agentRequirements: [RequirementItem]? = nil
     ) {
         updateSession(id: workspaceID) { session in
             guard let item = session.documents.first(where: { $0.id == id }) else { return }
@@ -460,7 +500,7 @@ final class AppViewModel: ObservableObject {
 
             if type == .requirements {
                 session.requirements.removeAll { sameFilename($0.sourceName, item.filename) }
-                session.requirements.append(contentsOf: requirementsAnalyzer.extract(
+                session.requirements.append(contentsOf: agentRequirements ?? requirementsAnalyzer.extract(
                     from: extraction,
                     sourceName: item.filename
                 ))
@@ -471,6 +511,14 @@ final class AppViewModel: ObservableObject {
 
     private func sameFilename(_ lhs: String, _ rhs: String) -> Bool {
         lhs.compare(rhs, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+    }
+
+    private func agentBackedExtraction(for url: URL) -> ExtractedDocument {
+        ExtractedDocument(
+            pages: ["이 모집요강은 Upstage Studio Agent가 직접 분석했습니다."],
+            provider: graduateRequirementsAnalyzer.providerLabel,
+            sourcePageNumbers: [nil]
+        )
     }
 
     private func invalidateAudit(_ session: inout ApplicationSession) {
