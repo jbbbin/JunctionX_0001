@@ -150,26 +150,6 @@ struct EmptyStateView: View {
     }
 }
 
-private struct GCSidebarGlassModifier: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .glassEffect(
-                    .regular.tint(GCTheme.brand.opacity(0.055)),
-                    in: .rect(cornerRadius: 22)
-                )
-        } else {
-            content
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(.white.opacity(0.18), lineWidth: 1)
-                }
-        }
-    }
-}
-
 private struct GCSidebarTabModifier: ViewModifier {
     let selected: Bool
 
@@ -198,10 +178,6 @@ private struct GCSidebarTabModifier: ViewModifier {
 extension View {
     func gcPagePadding() -> some View {
         padding(.horizontal, 30).padding(.vertical, 26)
-    }
-
-    func gcSidebarGlass() -> some View {
-        modifier(GCSidebarGlassModifier())
     }
 
     func gcSidebarTab(selected: Bool) -> some View {

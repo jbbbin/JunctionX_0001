@@ -81,12 +81,14 @@ struct SidebarView: View {
 
             Spacer(minLength: 16)
 
+            Divider()
+                .padding(.horizontal, 18)
+
             connectionCard
-                .padding(12)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .gcSidebarGlass()
-        .padding(8)
     }
 
     private var brand: some View {
@@ -121,10 +123,10 @@ struct SidebarView: View {
                 HStack(alignment: .top, spacing: 8) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(GCTheme.brandSoft)
+                            .fill(isSelected ? GCTheme.brand.opacity(0.16) : GCTheme.secondaryInk.opacity(0.07))
                         Text(workspace.school.prefix(1))
                             .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(GCTheme.brand)
+                            .foregroundStyle(isSelected ? GCTheme.brand : GCTheme.secondaryInk)
                     }
                     .frame(width: 31, height: 31)
                     VStack(alignment: .leading, spacing: 2) {
@@ -152,11 +154,17 @@ struct SidebarView: View {
                 }
             }
             .padding(11)
-            .background(isSelected ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.thinMaterial))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isSelected ? GCTheme.brand.opacity(0.55) : GCTheme.brand.opacity(0.10), lineWidth: isSelected ? 1.5 : 1)
+            .padding(.leading, 3)
+            .background(
+                isSelected ? GCTheme.brand.opacity(0.10) : .clear,
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(GCTheme.brand)
+                    .frame(width: 3)
+                    .padding(.vertical, 12)
+                    .opacity(isSelected ? 1 : 0)
             }
         }
         .buttonStyle(.plain)
@@ -179,8 +187,5 @@ struct SidebarView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(11)
-        .background(GCTheme.secondaryInk.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
 }
