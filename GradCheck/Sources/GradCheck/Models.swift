@@ -1,11 +1,11 @@
 import Foundation
 import SwiftUI
 
-enum AppDestination: String, CaseIterable, Identifiable {
-    case overview = "개요"
-    case documents = "지원 서류"
-    case audit = "검수 리포트"
-    case requirements = "모집 요건"
+enum AppDestination: String, CaseIterable, Identifiable, Hashable {
+    case overview = "지원 현황"
+    case documents = "Evidence Vault"
+    case audit = "제출 점검"
+    case requirements = "공식 요건 소스"
 
     var id: Self { self }
 
@@ -75,7 +75,7 @@ enum WorkspaceStatus: String, Codable {
     var color: Color {
         switch self {
         case .preparing: .secondary
-        case .needsReview: ReviewStatus.blocked.color
+        case .needsReview: ReviewStatus.humanReview.color
         case .ready: ReviewStatus.ready.color
         }
     }

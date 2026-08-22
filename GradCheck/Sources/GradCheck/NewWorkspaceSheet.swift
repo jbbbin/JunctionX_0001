@@ -20,41 +20,34 @@ struct NewWorkspaceSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("새 지원 목표")
-                        .font(.system(size: 23, weight: .bold))
-                    Text("학교 + 프로그램 + 학위 과정 하나를 독립적으로 검수합니다.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(width: 28, height: 28)
-                        .background(Color.black.opacity(0.05))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("새 검수 워크스페이스")
+                    .font(.system(size: 22, weight: .semibold))
+                Text("학교와 프로그램 하나를 등록한 뒤, 공식 모집요강과 제출 서류를 차례로 연결합니다.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(GCTheme.secondaryInk)
             }
-            .padding(26)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 26)
+            .padding(.vertical, 22)
 
             Divider()
 
             Form {
-                TextField("학교명", text: $school, prompt: Text("예: MIT"))
-                TextField("프로그램명", text: $program, prompt: Text("예: Electrical Engineering & Computer Science"))
-                Picker("학위 과정", selection: $degree) {
-                    Text("PhD").tag("PhD")
-                    Text("MS").tag("MS")
-                    Text("MA").tag("MA")
-                    Text("MEng").tag("MEng")
+                Section("지원 목표") {
+                    TextField("학교명", text: $school, prompt: Text("예: MIT"))
+                    TextField("프로그램명", text: $program, prompt: Text("예: Electrical Engineering & Computer Science"))
+                    Picker("학위 과정", selection: $degree) {
+                        Text("PhD").tag("PhD")
+                        Text("MS").tag("MS")
+                        Text("MA").tag("MA")
+                        Text("MEng").tag("MEng")
+                    }
+                    TextField("입학 학기", text: $intake, prompt: Text("예: Fall 2027"))
                 }
-                TextField("입학 학기", text: $intake, prompt: Text("예: Fall 2027"))
-                TextField("지원자 영문 이름 (선택)", text: $applicantName, prompt: Text("여권 기준 영문 이름"))
+                Section("지원자 정보") {
+                    TextField("지원자 영문 이름 (선택)", text: $applicantName, prompt: Text("여권 기준 영문 이름"))
+                }
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
@@ -68,7 +61,7 @@ struct NewWorkspaceSheet: View {
                 Spacer()
                 Button("취소") { dismiss() }
                     .buttonStyle(.bordered)
-                Button("지원 목표 만들기") {
+                Button("지원 추가") {
                     request(.create)
                 }
                 .buttonStyle(.borderedProminent)
@@ -77,7 +70,7 @@ struct NewWorkspaceSheet: View {
             }
             .padding(22)
         }
-        .frame(width: 560, height: 500)
+        .frame(width: 600, height: 520)
         .background(GCTheme.canvas)
         .alert("현재 지원 목표를 교체할까요?", isPresented: $showReplaceAlert) {
             Button("취소", role: .cancel) { pendingAction = nil }

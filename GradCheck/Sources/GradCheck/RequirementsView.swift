@@ -9,19 +9,17 @@ struct RequirementsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 HStack(alignment: .bottom) {
-                    SectionTitle(
-                        "공식 모집 요건",
-                        eyebrow: "REQUIREMENTS AGENT · P1",
+                    PageTitle(
+                        "공식 요건 소스",
                         subtitle: "학교 공통 규정과 프로그램 고유 규정을 분리하고, 모든 항목에 출처 페이지를 남깁니다."
                     )
                     Spacer()
                     Button {
                         showImporter = true
                     } label: {
-                        Label(sourceDocument == nil ? "모집요강 추가" : "모집요강 교체", systemImage: "doc.badge.plus")
+                        Label(sourceDocument == nil ? "소스 추가" : "소스 교체", systemImage: "doc.badge.plus")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(GCTheme.brand)
+                    .buttonStyle(.bordered)
                     .disabled(state.isImporting)
                 }
 
@@ -71,15 +69,15 @@ struct RequirementsView: View {
             HStack(spacing: 15) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(sourceDocument == nil ? Color.black.opacity(0.045) : GCTheme.brandSoft)
+                            .fill(GCTheme.surface)
                     Image(systemName: sourceDocumentSymbol)
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(sourceDocumentColor)
+                            .foregroundStyle(sourceDocument == nil ? GCTheme.secondaryInk : sourceDocumentColor)
                 }
                 .frame(width: 49, height: 49)
                 VStack(alignment: .leading, spacing: 5) {
                     Text(sourceDocument?.filename ?? "공식 출처 문서가 필요합니다")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(GCTheme.ink)
                     if let sourceDocument {
                         HStack(spacing: 8) {
@@ -87,18 +85,18 @@ struct RequirementsView: View {
                             Text("·")
                             Text(sourceDocument.isSample ? "합성 데모 출처" : state.providerLabel)
                         }
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(GCTheme.secondaryInk)
                     } else {
                         Text("대학원 또는 학과가 제공한 공식 PDF를 등록하세요.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 12))
+                            .foregroundStyle(GCTheme.secondaryInk)
                     }
                 }
                 Spacer()
                 if let sourceDocument {
                     Label(sourceDocument.processingStatus.label, systemImage: sourceDocument.processingStatus == .ready ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(sourceDocument.processingStatus == .ready ? ReviewStatus.ready.color : ReviewStatus.humanReview.color)
                 }
             }
@@ -122,11 +120,11 @@ struct RequirementsView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(scope.rawValue)
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(GCTheme.ink)
                         Text(scope == .university ? "대학원 전체에 적용되는 안내" : "선택한 프로그램에만 적용되는 안내")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 13))
+                            .foregroundStyle(GCTheme.secondaryInk)
                     }
                     Spacer()
                     Text("\(values.count)개")
@@ -152,11 +150,11 @@ struct RequirementsView: View {
                 .foregroundStyle(GCTheme.brand)
             VStack(alignment: .leading, spacing: 4) {
                 Text("추정하지 않는 요건 정리")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(GCTheme.ink)
                 Text("문서에 명시되지 않았거나 학교 안내와 프로그램 안내가 충돌하면 확정 요건으로 만들지 않고 HUMAN REVIEW로 남깁니다. 공식성, 면제 여부, 학점 환산은 기관의 최종 판단입니다.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(GCTheme.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -178,22 +176,22 @@ private struct RequirementRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 7) {
                     Text(requirement.title)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(GCTheme.ink)
                     Spacer()
                     Text(requirement.status == .humanReview ? "직접 확인" : "출처 확인")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(requirement.status.color)
                 }
                 Text(requirement.detail)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(GCTheme.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
                 Label(
                     requirement.page.map { "\(requirement.sourceName) · p.\($0)" } ?? requirement.sourceName,
                     systemImage: "doc.text"
                 )
-                .font(.system(size: 9, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(GCTheme.secondaryInk)
                 .lineLimit(1)
             }

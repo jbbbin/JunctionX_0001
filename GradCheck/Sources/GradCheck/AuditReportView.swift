@@ -44,12 +44,12 @@ struct AuditReportView: View {
     private var reportSummary: some View {
         HStack(spacing: 18) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("제출 준비 리포트")
-                    .font(.system(size: 18, weight: .bold))
+                Text("제출 점검")
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(GCTheme.ink)
                 Text("문제마다 원본 파일과 페이지 근거를 확인하세요.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(GCTheme.secondaryInk)
             }
             Spacer()
             ReportCount(status: .blocked, count: state.blockedCount)
@@ -62,6 +62,7 @@ struct AuditReportView: View {
                 Label("체크리스트 내보내기", systemImage: "square.and.arrow.up")
             }
             .buttonStyle(.bordered)
+            .controlSize(.small)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 15)
@@ -81,44 +82,35 @@ struct AuditReportView: View {
                 )
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 9) {
-                        ForEach(filteredFindings) { finding in
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(filteredFindings.enumerated()), id: \.element.id) { index, finding in
                             FindingListRow(
                                 finding: finding,
                                 selected: state.selectedFindingID == finding.id
                             ) {
                                 state.selectedFindingID = finding.id
                             }
+                            if index < filteredFindings.count - 1 {
+                                Divider().padding(.leading, 14)
+                            }
                         }
                     }
-                    .padding(14)
+                    .padding(.vertical, 6)
                 }
             }
         }
-        .background(GCTheme.surface.opacity(0.58))
+        .background(GCTheme.surface.opacity(0.42))
     }
 
     private var filterBar: some View {
-        HStack(spacing: 5) {
+        Picker("검수 상태", selection: $filter) {
             ForEach(FindingFilter.allCases) { item in
-                Button {
-                    filter = item
-                } label: {
-                    Text(item.title)
-                        .font(.system(size: 10, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
-                        .background(filter == item ? GCTheme.surface : .clear)
-                        .foregroundStyle(filter == item ? GCTheme.ink : .secondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                        .shadow(color: filter == item ? .black.opacity(0.055) : .clear, radius: 4, y: 1)
-                }
-                .buttonStyle(.plain)
+                Text(item.title).tag(item)
             }
         }
-        .padding(3)
-        .background(Color.black.opacity(0.045))
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .controlSize(.small)
     }
 
     @ViewBuilder
@@ -163,9 +155,9 @@ private enum FindingFilter: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .all: "전체"
-        case .blocked: "BLOCKED"
-        case .review: "REVIEW"
-        case .ready: "READY"
+        case .blocked: "수정 필요"
+        case .review: "직접 확인"
+        case .ready: "확인 완료"
         }
     }
 
@@ -190,7 +182,7 @@ private struct ReportCount: View {
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(GCTheme.ink)
             Text(status.rawValue)
-                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(status.color)
         }
     }
@@ -211,41 +203,36 @@ private struct FindingListRow: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(finding.category.rawValue)
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(finding.status.color)
                         if finding.isResolved {
                             Text("해결됨")
-                                .font(.system(size: 8, weight: .bold))
+                                .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(ReviewStatus.ready.color)
                         }
                         Spacer()
                         if let first = finding.evidences.first, let page = first.page {
                             Text("p.\(page)")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(GCTheme.secondaryInk)
                         }
                     }
                     Text(finding.title)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(GCTheme.ink)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                     Text(finding.summary)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                        .foregroundStyle(GCTheme.secondaryInk)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(selected ? GCTheme.surface : GCTheme.surface.opacity(0.46))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(selected ? finding.status.color.opacity(0.42) : GCTheme.line, lineWidth: 1)
-            }
-            .shadow(color: selected ? .black.opacity(0.05) : .clear, radius: 8, y: 2)
+            .background(selected ? GCTheme.selected.opacity(0.18) : .clear)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -266,18 +253,18 @@ private struct FindingDetailView: View {
                     Spacer()
                     if finding.isResolved {
                         Label("재검수로 해결됨", systemImage: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(ReviewStatus.ready.color)
                     }
                 }
 
                 VStack(alignment: .leading, spacing: 9) {
                     Text(finding.title)
-                        .font(.system(size: 25, weight: .bold))
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(GCTheme.ink)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(finding.summary)
-                        .font(.system(size: 14))
+                        .font(.system(size: 13))
                         .foregroundStyle(GCTheme.secondaryInk)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -288,7 +275,7 @@ private struct FindingDetailView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     SectionTitle(
                         finding.evidences.count > 1 ? "비교한 근거" : "확인한 근거",
-                        eyebrow: "EVIDENCE",
+                        eyebrow: "원문 근거",
                         subtitle: "자동 판단의 근거가 된 원문 위치입니다."
                     )
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 12)], spacing: 12) {
@@ -300,9 +287,8 @@ private struct FindingDetailView: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("다음 행동")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .tracking(0.7)
-                        .foregroundStyle(finding.status.color)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(GCTheme.ink)
                     HStack(alignment: .top, spacing: 11) {
                         Image(systemName: finding.status == .ready ? "checkmark.circle.fill" : "arrow.turn.down.right")
                             .font(.system(size: 15, weight: .semibold))
@@ -315,18 +301,18 @@ private struct FindingDetailView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .padding(17)
-                .background(finding.status.color.opacity(0.075))
-                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .stroke(finding.status.color.opacity(0.14), lineWidth: 1)
+                .padding(.leading, 16)
+                .padding(.vertical, 4)
+                .overlay(alignment: .leading) {
+                    Rectangle()
+                        .fill(finding.status.color)
+                        .frame(width: 3)
                 }
 
                 HStack {
                     Text("원본에서 수정한 뒤 해당 파일을 교체하면 영향받은 항목을 다시 검수합니다.")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                        .foregroundStyle(GCTheme.secondaryInk)
                     Spacer()
                     if finding.status != .ready {
                         Button {
@@ -355,23 +341,21 @@ private struct EvidenceCard: View {
             HStack(spacing: 9) {
                 Image(systemName: evidence.documentType.symbol)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(GCTheme.brand)
-                    .frame(width: 28, height: 28)
-                    .background(GCTheme.brandSoft)
-                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .foregroundStyle(GCTheme.secondaryInk)
+                    .frame(width: 22, height: 22)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(evidence.fieldLabel)
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(GCTheme.ink)
                     Text(evidence.sourceLabel)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(GCTheme.secondaryInk)
                         .lineLimit(1)
                 }
                 Spacer()
             }
             Text("“\(evidence.excerpt)”")
-                .font(.system(size: 12, design: .serif))
+                .font(.system(size: 13, design: .serif))
                 .foregroundStyle(GCTheme.secondaryInk)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -379,17 +363,15 @@ private struct EvidenceCard: View {
             HStack(spacing: 5) {
                 Circle().fill(status.color).frame(width: 5, height: 5)
                 Text("문서에 명시된 내용")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(GCTheme.secondaryInk)
             }
         }
-        .padding(15)
-        .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
-        .background(GCTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(GCTheme.line, lineWidth: 1)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 2)
+        .frame(maxWidth: .infinity, minHeight: 126, alignment: .topLeading)
+        .overlay(alignment: .bottom) {
+            Divider()
         }
     }
 }

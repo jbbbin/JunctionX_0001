@@ -6,20 +6,16 @@ struct AuditProgressSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .fill(GCTheme.brandSoft)
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(GCTheme.brand)
-                }
-                .frame(width: 42, height: 42)
+                Image(systemName: "sparkles")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(GCTheme.brand)
+                    .frame(width: 28)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("지원 패키지를 검수하고 있어요")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 18, weight: .semibold))
                     Text("문서에 적힌 사실만 사용해 근거를 연결합니다.")
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GCTheme.secondaryInk)
                 }
             }
             .padding(.bottom, 24)
@@ -38,8 +34,8 @@ struct AuditProgressSheet: View {
             }
 
             Text("GradCheck는 합격 가능성을 평가하거나 원서를 대신 작성하지 않습니다.")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 12))
+                .foregroundStyle(GCTheme.tertiaryInk)
                 .padding(.top, 22)
         }
         .padding(28)
@@ -53,10 +49,10 @@ struct AuditProgressSheet: View {
         return HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(complete || active ? GCTheme.brand : Color.black.opacity(0.055))
+                    .fill(complete || active ? GCTheme.brand : GCTheme.surface)
                 if complete {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(.white)
                 } else if active {
                     ProgressView()
@@ -64,7 +60,7 @@ struct AuditProgressSheet: View {
                         .tint(.white)
                 } else {
                     Image(systemName: phase.symbol)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -75,7 +71,7 @@ struct AuditProgressSheet: View {
             Spacer()
             if active {
                 Text("진행 중")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(GCTheme.brand)
             }
         }

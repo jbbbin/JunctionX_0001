@@ -13,10 +13,9 @@ struct DocumentsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 HStack(alignment: .bottom) {
-                    SectionTitle(
-                        "지원 서류",
-                        eyebrow: "APPLICATION PACKAGE",
-                        subtitle: "핵심 문서 4종을 함께 읽고 이름, 학력, 날짜, 목표 프로그램을 대조합니다."
+                    PageTitle(
+                        "Evidence Vault",
+                        subtitle: "현재 지원에 사용할 증빙을 보관하고, 이름·학력·날짜·목표 프로그램을 대조합니다."
                     )
                     Spacer()
                     Button {
@@ -25,8 +24,7 @@ struct DocumentsView: View {
                     } label: {
                         Label("파일 추가", systemImage: "plus")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(GCTheme.brand)
+                    .buttonStyle(.bordered)
                     .disabled(state.isImporting)
                 }
 
@@ -58,20 +56,16 @@ struct DocumentsView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("핵심 검수 서류")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(GCTheme.ink)
                         Text("PDF, TXT, RTF 또는 이미지 · 파일별 최대 처리 시간은 네트워크 환경에 따라 달라집니다.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 12))
+                            .foregroundStyle(GCTheme.secondaryInk)
                     }
                     Spacer()
                     Text("\(state.coreDocumentCount) / 4 준비")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(state.coreDocumentCount == 4 ? ReviewStatus.ready.color : GCTheme.secondaryInk)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background((state.coreDocumentCount == 4 ? ReviewStatus.ready.color : Color.secondary).opacity(0.08))
-                        .clipShape(Capsule())
                 }
                 .padding(20)
 
@@ -114,27 +108,18 @@ struct DocumentsView: View {
                 HStack(alignment: .center, spacing: 14) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .fill(GCTheme.blue.opacity(0.09))
+                .fill(GCTheme.surface)
                         Image(systemName: DocumentType.requirements.symbol)
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(GCTheme.blue)
+                            .foregroundStyle(GCTheme.secondaryInk)
                     }
                     .frame(width: 45, height: 45)
                     VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text("공식 모집요강")
-                                .font(.system(size: 14, weight: .bold))
-                            Text("P1")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundStyle(GCTheme.blue)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(GCTheme.blue.opacity(0.08))
-                                .clipShape(Capsule())
-                        }
+                        Text("공식 모집요강")
+                            .font(.system(size: 15, weight: .semibold))
                         Text("학교 공통 안내와 프로그램 고유 요건을 분리해 출처 페이지와 함께 정리합니다.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 12))
+                            .foregroundStyle(GCTheme.secondaryInk)
                     }
                     Spacer()
                     if let document = state.documents.first(where: { $0.type == .requirements }) {
@@ -144,7 +129,7 @@ struct DocumentsView: View {
                                 .foregroundStyle(document.processingStatus == .ready ? ReviewStatus.ready.color : ReviewStatus.humanReview.color)
                                 .lineLimit(1)
                             Text(document.metadata)
-                                .font(.system(size: 10))
+                                .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: 250, alignment: .trailing)
@@ -167,20 +152,20 @@ struct DocumentsView: View {
                 .foregroundStyle(isDropTargeted ? .white : GCTheme.brand)
             VStack(alignment: .leading, spacing: 2) {
                 Text("여기에 여러 파일을 놓아도 돼요")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(isDropTargeted ? .white : GCTheme.ink)
                 Text("파일명과 내용을 기준으로 문서 유형을 분류합니다.")
-                    .font(.system(size: 10))
+                    .font(.system(size: 12))
                     .foregroundStyle(isDropTargeted ? .white.opacity(0.75) : .secondary)
             }
             Spacer()
         }
         .padding(14)
-        .background(isDropTargeted ? GCTheme.brand : GCTheme.brandSoft.opacity(0.7))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(isDropTargeted ? GCTheme.brand : GCTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(GCTheme.brand.opacity(0.24), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(isDropTargeted ? GCTheme.brand : GCTheme.line, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
         }
         .dropDestination(for: URL.self) { urls, _ in
             state.importDocuments(urls)
@@ -192,7 +177,7 @@ struct DocumentsView: View {
 
     private var processingNote: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: state.isUpstageConnected ? "network.badge.shield.half.filled" : "lock.macwindow")
+            Image(systemName: state.isUpstageConnected ? "network.badge.shield.half.filled" : "lock.shield")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(GCTheme.brand)
             VStack(alignment: .leading, spacing: 4) {
@@ -225,10 +210,10 @@ private struct DocumentSlotRow: View {
         HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(document == nil ? Color.black.opacity(0.04) : GCTheme.brandSoft)
+                    .fill(GCTheme.surface)
                 Image(systemName: type.symbol)
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(document == nil ? Color.secondary : GCTheme.brand)
+                    .foregroundStyle(document == nil ? Color.secondary : GCTheme.secondaryInk)
             }
             .frame(width: 44, height: 44)
 
@@ -239,18 +224,18 @@ private struct DocumentSlotRow: View {
                 if let document {
                     HStack(spacing: 7) {
                         Text(document.filename)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(GCTheme.secondaryInk)
                             .lineLimit(1)
                         if !document.metadata.isEmpty {
                             Text(document.metadata)
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 11))
+                                .foregroundStyle(GCTheme.secondaryInk)
                                 .lineLimit(1)
                         }
                         if document.isSample {
                             Text("샘플")
-                                .font(.system(size: 8, weight: .bold))
+                                .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(GCTheme.blue)
                         }
                     }
@@ -277,6 +262,8 @@ private struct DocumentSlotRow: View {
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
+                .accessibilityLabel("\(type.title) 추가 작업")
+                .accessibilityHint("파일 교체 또는 제거 메뉴를 엽니다.")
             } else {
                 Button("파일 선택", action: replace)
                     .buttonStyle(.bordered)
@@ -301,15 +288,15 @@ private struct DocumentSlotRow: View {
                 ProgressView().controlSize(.small)
                 Text(status.label)
             }
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(GCTheme.blue)
         case .ready:
             Label(status.label, systemImage: "checkmark.circle.fill")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(ReviewStatus.ready.color)
         case .failed:
             Label(status.label, systemImage: "exclamationmark.triangle.fill")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(ReviewStatus.humanReview.color)
         }
     }

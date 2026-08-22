@@ -1,33 +1,34 @@
 import AppKit
 import SwiftUI
 
+// Keep every product color inside the macOS semantic system. This makes light
+// mode, dark mode, and increased-contrast settings behave like a native app.
 enum GCTheme {
     static let canvas = Color(nsColor: .windowBackgroundColor)
     static let surface = Color(nsColor: .controlBackgroundColor)
-    static let ink = Color.primary
-    static let secondaryInk = Color.secondary
+    static let content = Color(nsColor: .textBackgroundColor)
+    static let sidebar = Color(nsColor: .windowBackgroundColor)
+    static let ink = Color(nsColor: .labelColor)
+    static let secondaryInk = Color(nsColor: .secondaryLabelColor)
+    static let tertiaryInk = Color(nsColor: .tertiaryLabelColor)
     static let brand = Color(nsColor: .systemBlue)
     static let brandBright = brand
-    static let brandDeep = Color(nsColor: .systemIndigo)
     static let brandSoft = brand.opacity(0.12)
     static let line = Color(nsColor: .separatorColor)
+    static let selected = Color(nsColor: .selectedContentBackgroundColor)
     static let blue = brand
 }
 
+/// Use an inset group only for genuinely grouped information; the rows inside
+/// should provide hierarchy through dividers, not another layer of cards.
 struct SurfaceCard<Content: View>: View {
-    var padding: CGFloat = 20
+    var padding: CGFloat = 18
     @ViewBuilder var content: Content
 
     var body: some View {
         content
             .padding(padding)
-            .background(GCTheme.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(GCTheme.line, lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.025), radius: 12, y: 4)
+            .background(GCTheme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -39,14 +40,13 @@ struct StatusBadge: View {
         HStack(spacing: 5) {
             Image(systemName: status.symbol)
                 .font(.system(size: compact ? 10 : 11, weight: .semibold))
-            Text(status.rawValue)
-                .font(.system(size: compact ? 10 : 11, weight: .bold, design: .rounded))
+            Text(status.label)
+                .font(.system(size: compact ? 10 : 11, weight: .semibold))
         }
         .foregroundStyle(status.color)
         .padding(.horizontal, compact ? 8 : 10)
-        .padding(.vertical, compact ? 5 : 6)
-        .background(status.color.opacity(0.105))
-        .clipShape(Capsule())
+        .padding(.vertical, compact ? 4 : 5)
+        .background(status.color.opacity(0.10), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         .accessibilityLabel("\(status.rawValue), \(status.label)")
     }
 }
@@ -60,13 +60,9 @@ struct WorkspaceBadge: View {
                 .fill(status.color)
                 .frame(width: 7, height: 7)
             Text(status.label)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
         }
         .foregroundStyle(status.color)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(status.color.opacity(0.09))
-        .clipShape(Capsule())
     }
 }
 
@@ -78,10 +74,6 @@ struct PageSourceChip: View {
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(GCTheme.secondaryInk)
             .lineLimit(1)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(GCTheme.secondaryInk.opacity(0.09))
-            .clipShape(Capsule())
     }
 }
 
@@ -97,20 +89,44 @@ struct SectionTitle: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 4) {
             if let eyebrow {
-                Text(eyebrow.uppercased())
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .tracking(1.1)
-                    .foregroundStyle(GCTheme.brandBright)
+                Text(eyebrow)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(GCTheme.secondaryInk)
             }
             Text(title)
-                .font(.system(size: 18, weight: .bold))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(GCTheme.ink)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.system(size: 12))
+                    .foregroundStyle(GCTheme.secondaryInk)
+            }
+        }
+    }
+}
+
+/// Reserved for the title of a whole destination. Inset groups should use
+/// `SectionTitle` so the page hierarchy is never flattened by oversized text.
+struct PageTitle: View {
+    let title: String
+    let subtitle: String?
+
+    init(_ title: String, subtitle: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(GCTheme.ink)
             if let subtitle {
                 Text(subtitle)
                     .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(GCTheme.secondaryInk)
             }
         }
     }
@@ -124,19 +140,16 @@ struct EmptyStateView: View {
     var action: (() -> Void)?
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             Image(systemName: symbol)
-                .font(.system(size: 30, weight: .medium))
+                .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(GCTheme.brand)
-                .frame(width: 64, height: 64)
-                .background(GCTheme.brandSoft)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             Text(title)
-                .font(.system(size: 18, weight: .bold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(GCTheme.ink)
             Text(message)
                 .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GCTheme.secondaryInk)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 420)
             if let actionTitle, let action {
@@ -145,66 +158,14 @@ struct EmptyStateView: View {
                     .tint(GCTheme.brand)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 280)
-        .padding(30)
-    }
-}
-
-private struct GCSidebarGlassModifier: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .glassEffect(
-                    .regular.tint(GCTheme.brand.opacity(0.055)),
-                    in: .rect(cornerRadius: 22)
-                )
-        } else {
-            content
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(.white.opacity(0.18), lineWidth: 1)
-                }
-        }
-    }
-}
-
-private struct GCSidebarTabModifier: ViewModifier {
-    let selected: Bool
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            if selected {
-                content
-                    .glassEffect(
-                        .regular.tint(GCTheme.brand.opacity(0.18)).interactive(),
-                        in: .rect(cornerRadius: 10)
-                    )
-            } else {
-                content
-            }
-        } else {
-            content
-                .background(
-                    selected ? GCTheme.brand.opacity(0.13) : .clear,
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                )
-        }
+        .frame(maxWidth: .infinity, minHeight: 230)
+        .padding(28)
     }
 }
 
 extension View {
     func gcPagePadding() -> some View {
-        padding(.horizontal, 30).padding(.vertical, 26)
+        padding(.horizontal, 28).padding(.vertical, 24)
     }
 
-    func gcSidebarGlass() -> some View {
-        modifier(GCSidebarGlassModifier())
-    }
-
-    func gcSidebarTab(selected: Bool) -> some View {
-        modifier(GCSidebarTabModifier(selected: selected))
-    }
 }

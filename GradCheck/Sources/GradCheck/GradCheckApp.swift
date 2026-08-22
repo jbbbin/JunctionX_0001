@@ -8,13 +8,13 @@ struct GradCheckApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(state)
-                .frame(minWidth: 1080, minHeight: 700)
+                .frame(minWidth: 1_180, minHeight: 760)
         }
-        .defaultSize(width: 1280, height: 820)
+        .defaultSize(width: 1_440, height: 900)
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("새 지원 목표") {
+                Button("지원 추가") {
                     state.showNewWorkspace = true
                 }
                 .keyboardShortcut("n")
