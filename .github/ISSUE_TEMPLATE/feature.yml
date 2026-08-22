@@ -1,80 +1,23 @@
-name: "기능 제안"
-description: "사용자 가치와 완료 기준이 명확한 새 기능 제안"
-title: "[Feature] "
-labels:
-  - enhancement
+name: ✨ 기능 추가
+description: 새로 구현하고 싶은 기능이 있다면 적어주세요.
+title: "feat: "
+labels: ["feature"]
 body:
   - type: textarea
-    id: problem
+    id: summary
     attributes:
-      label: 해결하려는 문제
-      description: 구현 방식보다 사용자가 겪는 문제를 먼저 설명해주세요.
+      label: 📌 요약
+      placeholder: 어떤 기능인지 간단히 써주세요.
     validations:
       required: true
 
   - type: textarea
-    id: proposal
+    id: tasks
     attributes:
-      label: 제안하는 기능
-      description: 사용자 흐름과 핵심 동작을 구체적으로 적어주세요.
-    validations:
-      required: true
-
-  - type: textarea
-    id: scope
-    attributes:
-      label: 구현 범위
+      label: ✅ 할 일
+      value: "- [ ] "
       placeholder: |
-        - [ ] UI
-        - [ ] 데이터 처리
-        - [ ] 오류 및 빈 상태
-        - [ ] 테스트
+        - [ ] UI 레이아웃
+        - [ ] API 연동
     validations:
-      required: true
-
-  - type: textarea
-    id: out_of_scope
-    attributes:
-      label: 이번 작업에서 제외할 내용
-
-  - type: textarea
-    id: dependencies
-    attributes:
-      label: 의존성 및 관련 이슈
-      placeholder: "관련 이슈 번호, 디자인, API. 없으면 '없음'."
-    validations:
-      required: true
-
-  - type: textarea
-    id: acceptance
-    attributes:
-      label: 완료 조건
-      description: 검증 가능한 문장으로 작성해주세요.
-      placeholder: |
-        - [ ] 사용자가 기능의 시작과 완료 상태를 알 수 있다.
-        - [ ] 실패 상황에서 복구 방법을 안내한다.
-        - [ ] 테스트가 통과한다.
-    validations:
-      required: true
-
-  - type: input
-    id: owner
-    attributes:
-      label: 담당 Codex
-      placeholder: Codex C
-    validations:
-      required: true
-
-  - type: input
-    id: branch
-    attributes:
-      label: 작업 브랜치
-      placeholder: feature/24-new-feature
-    validations:
-      required: true
-
-  - type: textarea
-    id: notes
-    attributes:
-      label: 참고 자료 및 인수인계 메모
-      description: 디자인 링크, API 문서, 결정 사항과 주의점을 적어주세요.
+      required: false
