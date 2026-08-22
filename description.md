@@ -25,15 +25,15 @@
 ```text
 모집요강 업로드
       ↓
-Upstage Document AI 분석
+Firebase Storage에 원본 저장
       ↓
-마감일 · 지원 조건 · 필요 서류 추출
+Cloud Functions가 Upstage Studio 호출
       ↓
-사용자 프로필 · 보유 문서와 대조
+분야 분류 · 정보 추출 · 프로필·문서 대조
       ↓
-Application Workspace 자동 생성
+Firestore에 Workspace 결과 저장
       ↓
-서류 준비 · 진행 관리 · 접수처 이동
+앱에서 실시간 Workspace 표시
 ```
 
 ## 2. 문제 정의
@@ -158,29 +158,78 @@ Upstage Document AI를 사용해 서로 다른 형식의 한국어 모집요강�
 사용자가 준비한 서류를 확인하고 공식 접수 웹사이트로 이동할 수 있게 한다.
 자동 제출은 하지 않으며, 인증과 최종 제출은 사용자가 직접 수행한다.
 
-## 6. 기술 구조와 Upstage의 역할
+## 6. 기술 구조와 역할 분담
 
-### Upstage Document AI
+MVP는 별도의 전통적인 서버를 운영하지 않고 **Firebase 기반의 얇은 백엔드와
+Upstage Studio**를 조합한다.
 
-- 복잡한 표, 서식과 서술형 조건이 포함된 한국어 공고문을 분석한다.
-- 비정형 문서를 `ApplicationRequirement` 형태의 정형 데이터로 변환한다.
-- 마감일, 자격 요건, 필수 서류 및 원문 근거를 추출한다.
+```text
+iOS App
+  │ PDF 업로드
+  ▼
+Firebase Storage
+  │ 분석 요청
+  ▼
+Cloud Functions
+  ├─ Upstage API 키 보호
+  ├─ Upstage Studio 호출
+  └─ 공통 ApplicationRequirement로 변환
+  ▼
+Cloud Firestore
+  │ 분석 상태 및 결과 실시간 반영
+  ▼
+Dashboard · Application Workspace
+```
 
-### Application Workspace
+### Firebase
 
+- **Firebase Authentication:** 사용자와 데이터 소유자를 식별한다.
+- **Cloud Storage:** 모집요강과 사용자의 보유 문서를 저장한다.
+- **Cloud Functions 2nd gen:** 업로드된 문서를 읽어 Upstage Studio를 호출하고
+  결과를 앱의 공통 데이터 구조로 변환한다.
+- **Cloud Firestore:** 분석 상태, 지원 정보, 준비율과 다음 행동을 저장하고 앱에
+  실시간으로 전달한다.
+- **Secret Manager:** Upstage API 키를 앱과 저장소에 노출하지 않고 함수에만
+  제공한다.
+- **Security Rules:** 사용자별 문서와 데이터 접근을 제한하고 파일 형식 및
+  크기를 검증한다.
+
+Firebase는 서버를 직접 운영하지 않으면서 업로드, 분석 상태와 데이터 동기화를
+담당한다. Cloud Functions를 실제 배포하려면 Blaze 요금제가 필요하므로 예산
+알림과 사용 한도를 함께 설정한다.
+
+### Upstage Studio
+
+- 채용, 장학금과 공모전·대회의 서로 다른 문서 형식을 분류한다.
+- 복잡한 표, 서식과 서술형 조건이 포함된 한국어 공고문을 파싱한다.
+- 공통 정보와 분야별 필드를 구조화된 결과로 추출한다.
+- 마감일, 자격 요건, 필수 서류와 원문 근거를 반환한다.
+
+### iOS Application Workspace
+
+- Firebase Storage에 문서를 한 번 업로드한다.
+- Firestore의 `uploaded → analyzing → completed | failed` 상태를 구독한다.
 - 추출된 요구사항을 사용자 프로필과 비교한다.
 - 필요 서류를 보유 문서와 연결한다.
 - 결과를 사용자가 실행할 수 있는 체크리스트와 진행 상태로 변환한다.
+- D-Day, 지원 가능 상태, 준비율, 남은 작업과 다음 행동을 한 화면에 표시한다.
 
-즉, Upstage가 문서를 이해하는 엔진이라면 Application Workspace는 그 결과를
-사용자의 행동으로 연결하는 실행 계층이다.
+즉, Firebase가 문서와 처리 상태를 안전하게 연결하고, Upstage Studio가 문서를
+이해하며, iOS 앱이 그 결과를 사용자의 행동으로 변환한다.
 
 ## 7. MVP 범위
 
 ### 포함
 
 - [ ] PDF 모집요강 업로드
-- [ ] Upstage API 기반 정보 추출
+- [ ] Firebase Authentication 기반 사용자 구분
+- [ ] Firebase Storage 기반 모집요강·보유 문서 업로드
+- [ ] Cloud Functions 기반 Upstage Studio 호출
+- [ ] Secret Manager 기반 Upstage API 키 보호
+- [ ] Firestore 기반 분석 상태와 Workspace 저장
+- [ ] Firestore 실시간 구독을 통한 자동 화면 갱신
+- [ ] Storage·Firestore 사용자별 보안 규칙
+- [ ] Upstage Studio 기반 분야 분류와 정보 추출
 - [ ] 사용자 프로필 저장
 - [ ] 보유 문서 등록 및 관리
 - [ ] 지원 조건 비교와 3단계 상태 표시
@@ -201,6 +250,7 @@ Upstage Document AI를 사용해 서로 다른 형식의 한국어 모집요강�
 - 자동 지원 및 자동 제출
 - 복잡한 알림 설정
 - 협업 및 지원 통계 화면
+- 별도로 운영하는 전통적인 백엔드 서버
 
 필요한 경우 캘린더, 웹 브라우저와 편집 기능은 기존 시스템 또는 외부
 서비스로 연결한다.

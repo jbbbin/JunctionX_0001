@@ -49,7 +49,7 @@ DashboardView
 
 ### 핵심 사용자 흐름
 
-`Dashboard → 문서 1회 업로드 → 분야 자동 분류 → Upstage Studio 분석 → 프로필·문서 자동 대조 → Workspace 자동 생성`
+`문서 1회 업로드 → Firebase Storage → Cloud Functions → Upstage Studio → Firestore → Workspace 자동 표시`
 
 사용자가 체감하는 필수 단계는 **문서 업로드 1회**다. 분석 과정은 자동으로
 이어지고, 판단할 수 없는 항목이 있을 때만 최소한의 확인을 요청한다.
@@ -86,11 +86,12 @@ DashboardView
   Feature             설명                                      우선순위
   ------------------- ----------------------------------------- ----------
   PDF 선택            Files에서 모집요강 선택                    P0
-  즉시 분석 시작      업로드 완료 후 별도 버튼 없이 자동 분석    P0
+  Storage 업로드      Firebase Storage에 사용자별 경로로 저장     P0
+  즉시 분석 시작      업로드 완료 후 별도 버튼 없이 함수 실행     P0
   분야 자동 분류      채용 / 장학금 / 공모전·대회 자동 판별      P0
   선택 파일 표시      선택한 파일명 및 처리 상태 표시             P0
   파일 제거 / 변경    잘못 선택한 파일 교체                       P0
-  분석 결과 자동 저장 Workspace 생성 결과를 별도 저장 없이 유지  P0
+  분석 결과 자동 저장 Firestore에 Workspace 결과 자동 저장       P0
   분야 수정           자동 분류가 틀린 경우에만 간단히 변경       P1
   Drag & Drop         파일을 직접 드롭하여 추가                   P1
   이미지 업로드       이미지 형식의 모집요강 추가                 P1
@@ -107,7 +108,7 @@ DashboardView
 
   Feature             설명                                      우선순위
   ------------------- ----------------------------------------- ----------
-  분석 진행 표시      현재 문서를 처리하고 있음을 표시           P0
+  분석 진행 표시      Firestore의 처리 상태를 실시간 표시         P0
   자동 화면 전환      완료 시 Workspace로 즉시 이동               P0
   분석 실패 처리      짧은 실패 메시지와 한 번의 재시도           P0
   최소 확인 요청      불확실한 값만 결과 화면에서 확인 요청       P0
@@ -119,8 +120,8 @@ DashboardView
 
 ## 5. Upstage Studio Analysis
 
-**목적:** 형식이 다른 세 분야의 모집 문서에서 필요한 정보를 일관된 구조로
-추출한다.
+**목적:** Cloud Functions에서 Upstage Studio를 호출해 형식이 다른 세 분야의
+모집 문서에서 필요한 정보를 일관된 구조로 추출한다.
 
 ### 5.1 공통 추출 정보
 
@@ -143,9 +144,9 @@ DashboardView
   장학금           장학 금액 / 성적 기준 / 소득분위 / 재학 조건
   공모전·대회      참가 분야 / 개인·팀 조건 / 제출 형식 / 시상 내용
 
-모든 결과는 공통 `ApplicationRequirement` 구조와 분야별 확장 필드로 저장한다.
-사용자에게 전체 추출 결과 검토를 요구하지 않으며, `확인 필요` 항목만 수정할 수
-있게 한다.
+Cloud Functions가 Studio 결과를 공통 `ApplicationRequirement` 구조와 분야별
+확장 필드로 변환해 Firestore에 저장한다. 사용자에게 전체 추출 결과 검토를
+요구하지 않으며, `확인 필요` 항목만 수정할 수 있게 한다.
 
 ------------------------------------------------------------------------
 
@@ -271,7 +272,66 @@ MVP에서는 모든 개인정보를 모델링하지 않고 **실제 데모 모�
 
 ------------------------------------------------------------------------
 
-## 9. View별 중요도
+## 9. Firebase Backend
+
+**목적:** 별도의 서버를 직접 운영하지 않고 안전한 문서 업로드, Upstage 호출,
+처리 상태와 Workspace 데이터 동기화를 제공한다.
+
+### 9.1 서비스별 역할
+
+  Service                    역할                                      우선순위
+  -------------------------- ----------------------------------------- ----------
+  Firebase Authentication    사용자와 데이터 소유자 식별               P0
+  Cloud Storage              모집요강·보유 문서 저장                    P0
+  Cloud Functions 2nd gen    Upstage Studio 호출과 결과 변환            P0
+  Cloud Firestore            분석 상태·Workspace·준비 현황 저장         P0
+  Secret Manager             Upstage API 키를 함수에만 제공             P0
+  Storage Security Rules     사용자별 접근·파일 형식·크기 제한          P0
+  Firestore Security Rules   사용자별 Application·Profile 접근 제한     P0
+  Firebase App Check         정상 앱에서 발생한 요청인지 검증           P1
+  Budget Alert               Blaze 요금제 사용량 모니터링                P0
+
+Upstage API 키는 iOS 앱, Git 저장소와 일반 `.env` 파일에 저장하지 않는다.
+Cloud Functions에서 Secret Manager에 등록된 키만 사용한다.
+
+### 9.2 처리 상태
+
+```text
+uploaded → analyzing → completed
+                     └→ failed → retrying
+```
+
+- 앱은 Firestore 상태를 구독해 분석 화면과 Workspace를 자동 갱신한다.
+- 실패 시 사용자가 누르는 버튼은 `다시 시도` 하나로 제한한다.
+- 분석이 끝나도 전체 결과 확인 단계를 추가하지 않는다.
+
+### 9.3 Firestore 데이터 구조
+
+```text
+users/{userId}
+├── profile
+├── documents/{documentId}
+└── applications/{applicationId}
+    ├── status
+    ├── category
+    ├── title
+    ├── organization
+    ├── deadline
+    ├── eligibility
+    ├── requiredDocuments
+    ├── progress
+    ├── remainingTaskCount
+    ├── nextAction
+    └── sourcePath
+```
+
+모집요강과 증빙서류는 민감정보를 포함할 수 있으므로 공개 URL을 기본값으로
+사용하지 않는다. 사용자별 Storage 경로와 Security Rules를 적용하고, 원본
+문서의 보관 기간 및 삭제 정책은 배포 전에 결정한다.
+
+------------------------------------------------------------------------
+
+## 10. View별 중요도
 
   View                         중요도 이유
   -------------------------- -------- ----------------------------------
@@ -284,11 +344,21 @@ MVP에서는 모든 개인정보를 모델링하지 않고 **실제 데모 모�
 
 ------------------------------------------------------------------------
 
-## 10. 개발 우선순위
+## 11. 개발 우선순위
+
+### Phase 0 --- Firebase 기반 구성
+
+-   Firebase iOS SDK 연결
+-   Firebase Authentication 적용
+-   Storage·Firestore 데이터 구조 및 Security Rules 작성
+-   Cloud Functions 2nd gen 생성
+-   Secret Manager에 Upstage API 키 등록
+-   Firestore 분석 상태 모델 구현
+-   Blaze 요금제 예산 알림 설정
 
 ### Phase 1 --- 핵심 AI 경험
 
-`문서 업로드 → Upstage Studio → ApplicationWorkspaceView`
+`Storage 업로드 → Cloud Functions → Upstage Studio → Firestore → ApplicationWorkspaceView`
 
 -   PDF 업로드 1회로 자동 분석 시작
 -   채용 / 장학금 / 공모전·대회 자동 분류
@@ -337,7 +407,7 @@ MVP에서는 모든 개인정보를 모델링하지 않고 **실제 데모 모�
 
 ------------------------------------------------------------------------
 
-## 11. MVP에서 제외할 View / Feature
+## 12. MVP에서 제외할 View / Feature
 
 -   자체 CalendarView
 -   자체 WebBrowserView
@@ -351,18 +421,19 @@ MVP에서는 모든 개인정보를 모델링하지 않고 **실제 데모 모�
 -   채용 / 장학금 / 공모전·대회 이외의 지원 분야
 -   업로드 전 분야·추출 항목을 설정하는 복잡한 입력 단계
 -   전체 AI 분석 결과를 매번 검토하는 확인 단계
+-   별도로 배포·운영하는 전통적인 백엔드 서버
 
 필요할 경우 기존 시스템 기능이나 외부 서비스 연결로 대체한다.
 
 ------------------------------------------------------------------------
 
-## 12. 핵심 Vertical Slice
+## 13. 핵심 Vertical Slice
 
 ``` text
                     My Profile
                         │
                         ↓
-모집요강 PDF → Upstage Studio → Requirements
+모집요강 PDF → Firebase → Upstage Studio → Requirements
                         │
                         ↓
 My Documents ───────→ Matching
@@ -384,5 +455,6 @@ My Documents ───────→ Matching
 - 첫 화면에서 D-Day, 지원 가능 상태, 준비율, 남은 작업과 다음 행동이 보인다.
 - 사용자는 불확실한 항목만 확인한다.
 - 같은 프로필과 문서는 다시 입력하거나 연결하지 않는다.
+- 분석 상태와 결과는 Firestore를 통해 자동 갱신된다.
 
 이 Vertical Slice와 UX 성공 조건을 먼저 완성한 이후 부가 기능을 확장한다.
