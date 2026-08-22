@@ -21,11 +21,8 @@ struct OverviewView: View {
                 HStack(alignment: .top, spacing: 18) {
                     priorityCard
                         .frame(maxWidth: .infinity)
-                    VStack(spacing: 18) {
-                        documentReadinessCard
-                        auditHistoryCard
-                    }
-                    .frame(width: 330)
+                    documentReadinessCard
+                        .frame(width: 330)
                 }
 
                 safetyNote
@@ -294,38 +291,6 @@ struct OverviewView: View {
                 Button("서류 관리") { state.destination = .documents }
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-        }
-    }
-
-    private var auditHistoryCard: some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: 14) {
-                SectionTitle("최근 검수", eyebrow: "HISTORY")
-                if let latest = state.history.first {
-                    HStack(alignment: .top, spacing: 11) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(GCTheme.brand)
-                            .frame(width: 30, height: 30)
-                            .background(GCTheme.brandSoft)
-                            .clipShape(Circle())
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(latest.note)
-                                .font(.system(size: 12, weight: .semibold))
-                            Text(latest.date.formatted(date: .abbreviated, time: .shortened))
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                            Text("BLOCKED \(latest.blockedCount) · REVIEW \(latest.reviewCount) · READY \(latest.readyCount)")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundStyle(GCTheme.secondaryInk)
-                        }
-                    }
-                } else {
-                    Text("아직 검수 이력이 없습니다.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
             }
         }
     }
