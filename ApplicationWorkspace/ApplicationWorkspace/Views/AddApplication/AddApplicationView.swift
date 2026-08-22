@@ -2,69 +2,12 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct AddApplicationView: View {
-    enum AnalysisPhase: Int, CaseIterable {
-        case waiting
-        case uploading
-        case classifying
-        case extracting
-        case matching
-        case completed
-        case failed
+    private typealias AnalysisPhase = AddApplicationViewModel.AnalysisPhase
 
-        var title: String {
-            switch self {
-            case .waiting: "모집요강을 선택해 주세요"
-            case .uploading: "문서를 안전하게 업로드 중"
-            case .classifying: "지원 분야를 분류하는 중"
-            case .extracting: "조건과 제출 서류를 읽는 중"
-            case .matching: "내 프로필·문서와 대조하는 중"
-            case .completed: "워크스페이스 준비 완료"
-            case .failed: "분석을 완료하지 못했어요"
-            }
-        }
-
-        var subtitle: String {
-            switch self {
-            case .waiting: "모집요강 한 번만 올리면 나머지는 자동으로 진행돼요."
-            case .uploading: "Firebase Storage에 원본을 저장하고 있어요."
-            case .classifying: "채용·장학금·공모전 중 알맞은 분야를 찾고 있어요."
-            case .extracting: "Upstage Studio가 마감일과 요구사항을 구조화하고 있어요."
-            case .matching: "이미 가진 문서와 새로 준비할 항목을 나누고 있어요."
-            case .completed: "결과 화면으로 바로 이동할게요."
-            case .failed: "파일을 확인한 뒤 한 번만 다시 시도해 주세요."
-            }
-        }
-
-        var progress: Double {
-            switch self {
-            case .waiting: 0
-            case .uploading: 0.18
-            case .classifying: 0.38
-            case .extracting: 0.66
-            case .matching: 0.86
-            case .completed: 1
-            case .failed: 0
-            }
-        }
-    }
-
-    @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
-    @State private var isShowingImporter = false
-    @State private var selectedFilename: String?
-    @State private var phase: AnalysisPhase = .waiting
-    @State private var analysisTask: Task<Void, Never>?
+    @ObservedObject var viewModel: AddApplicationViewModel
 
     let onCompleted: (UUID) -> Void
-
-    init(
-        initialFilename: String? = nil,
-        onCompleted: @escaping (UUID) -> Void
-    ) {
-        _selectedFilename = State(initialValue: initialFilename)
-        _phase = State(initialValue: initialFilename == nil ? .waiting : .uploading)
-        self.onCompleted = onCompleted
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -72,8 +15,8 @@ struct AddApplicationView: View {
             Divider()
 
             VStack(spacing: 24) {
-                if let selectedFilename {
-                    analysisContent(filename: selectedFilename)
+                if let sourceDisplayName = viewModel.sourceDisplayName {
+                    analysisContent(sourceDisplayName: sourceDisplayName)
                 } else {
                     uploadContent
                 }
@@ -84,21 +27,20 @@ struct AddApplicationView: View {
         .frame(width: 640, height: 590)
         .background(Color.awCanvas)
         .fileImporter(
-            isPresented: $isShowingImporter,
+            isPresented: $viewModel.isShowingImporter,
             allowedContentTypes: [.pdf, .image],
-            allowsMultipleSelection: false
-        ) { result in
-            guard case let .success(urls) = result, let url = urls.first else { return }
-            selectedFilename = url.lastPathComponent
-            beginAnalysis()
-        }
+            allowsMultipleSelection: false,
+            onCompletion: viewModel.handleFileImport
+        )
         .onAppear {
-            if selectedFilename != nil, phase == .uploading, analysisTask == nil {
-                beginAnalysis()
-            }
+            viewModel.startIfNeeded()
         }
         .onDisappear {
-            analysisTask?.cancel()
+            viewModel.cancel()
+        }
+        .onChange(of: viewModel.completedApplicationID) { _, applicationID in
+            guard let applicationID else { return }
+            onCompleted(applicationID)
         }
     }
 
@@ -107,12 +49,13 @@ struct AddApplicationView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("새 공고 추가")
                     .font(.title2.weight(.bold))
-                Text("복잡한 설정 없이 모집요강만 선택하세요")
+                Text("파일이나 공고 주소 하나만 입력하면 자동으로 정리해 드려요")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
             Spacer()
             Button {
+                viewModel.cancel()
                 dismiss()
             } label: {
                 Image(systemName: "xmark")
@@ -125,31 +68,74 @@ struct AddApplicationView: View {
     }
 
     private var uploadContent: some View {
-        VStack(spacing: 22) {
-            Spacer()
+        VStack(spacing: 18) {
+            Spacer(minLength: 0)
             ZStack {
                 Circle()
                     .fill(Color.awAccentSoft)
-                    .frame(width: 108, height: 108)
+                    .frame(width: 92, height: 92)
                 Image(systemName: "doc.badge.plus")
-                    .font(.system(size: 44, weight: .medium))
+                    .font(.system(size: 38, weight: .medium))
                     .foregroundStyle(Color.awAccent)
             }
 
-            VStack(spacing: 8) {
-                Text(phase.title)
+            VStack(spacing: 7) {
+                Text(viewModel.phase.title)
                     .font(.title3.weight(.bold))
-                Text(phase.subtitle)
+                Text(viewModel.phase.subtitle)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 
             Button {
-                isShowingImporter = true
+                viewModel.isShowingImporter = true
             } label: {
                 Label("모집요강 파일 선택", systemImage: "folder")
             }
             .buttonStyle(PrimaryButtonStyle())
+
+            HStack(spacing: 10) {
+                Rectangle()
+                    .fill(Color.awBorder)
+                    .frame(height: 1)
+                Text("또는 공고 URL")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                Rectangle()
+                    .fill(Color.awBorder)
+                    .frame(height: 1)
+            }
+            .frame(maxWidth: 460)
+
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "link")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("https://example.com/recruit", text: $viewModel.urlDraft)
+                        .textFieldStyle(.plain)
+                        .onSubmit(viewModel.analyzeURL)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 38)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 9))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9)
+                        .stroke(Color.awBorder, lineWidth: 1)
+                )
+
+                Button("분석하기", action: viewModel.analyzeURL)
+                    .buttonStyle(SecondaryButtonStyle())
+                    .disabled(viewModel.urlDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .frame(maxWidth: 460)
+
+            if let errorMessage = viewModel.errorMessage {
+                errorCallout(errorMessage) {
+                    viewModel.analyzeURL()
+                }
+            }
 
             HStack(spacing: 18) {
                 Label("채용", systemImage: ApplicationCategory.employment.icon)
@@ -158,41 +144,41 @@ struct AddApplicationView: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
-            Spacer()
+            Spacer(minLength: 0)
         }
     }
 
-    private func analysisContent(filename: String) -> some View {
+    private func analysisContent(sourceDisplayName: String) -> some View {
         VStack(spacing: 24) {
             SectionCard {
                 HStack(spacing: 14) {
-                    Image(systemName: "doc.richtext.fill")
+                    Image(systemName: sourceIcon)
                         .font(.title2)
                         .foregroundStyle(Color.awAccent)
                         .frame(width: 44, height: 44)
                         .background(Color.awAccent.opacity(0.11), in: RoundedRectangle(cornerRadius: 11))
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(filename)
+                        Text(sourceDisplayName)
                             .font(.headline)
                             .lineLimit(1)
-                        Text("모집요강 파일")
+                        Text(sourceKindTitle)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if phase != .completed {
+                    if viewModel.phase != .completed {
                         Button("변경") {
-                            isShowingImporter = true
+                            changeSource()
                         }
                         .buttonStyle(.borderless)
                         Button {
-                            removeFile()
+                            viewModel.removeSource()
                         } label: {
                             Image(systemName: "trash")
                                 .foregroundStyle(.red)
                         }
                         .buttonStyle(.borderless)
-                        .help("선택한 파일 제거")
+                        .help("선택한 원본 제거")
                     }
                 }
             }
@@ -202,19 +188,19 @@ struct AddApplicationView: View {
                     Circle()
                         .stroke(Color.primary.opacity(0.08), lineWidth: 8)
                     Circle()
-                        .trim(from: 0, to: phase.progress)
+                        .trim(from: 0, to: viewModel.phase.progress)
                         .stroke(Color.awAccent, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                        .animation(.easeInOut(duration: 0.35), value: phase.progress)
-                    Image(systemName: phase == .completed ? "checkmark" : "sparkles")
+                        .animation(.easeInOut(duration: 0.35), value: viewModel.phase.progress)
+                    Image(systemName: phaseIcon)
                         .font(.title.weight(.bold))
-                        .foregroundStyle(phase == .completed ? .green : Color.awAccent)
+                        .foregroundStyle(phaseTint)
                 }
                 .frame(width: 94, height: 94)
 
-                Text(phase.title)
+                Text(viewModel.phase.title)
                     .font(.title3.weight(.bold))
-                Text(phase.subtitle)
+                Text(viewModel.phase.subtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -223,11 +209,10 @@ struct AddApplicationView: View {
 
             progressSteps
 
-            if phase == .failed {
-                Button("다시 시도") {
-                    beginAnalysis()
+            if let errorMessage = viewModel.errorMessage {
+                errorCallout(errorMessage) {
+                    viewModel.beginAnalysis()
                 }
-                .buttonStyle(PrimaryButtonStyle())
             }
             Spacer(minLength: 0)
         }
@@ -247,7 +232,7 @@ struct AddApplicationView: View {
     }
 
     private func phaseStep(_ title: String, threshold: AnalysisPhase) -> some View {
-        let isReached = phase.rawValue >= threshold.rawValue && phase != .failed
+        let isReached = viewModel.phase.rawValue >= threshold.rawValue && viewModel.phase != .failed
         return VStack(spacing: 7) {
             Image(systemName: isReached ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(isReached ? Color.awAccent : Color.secondary.opacity(0.45))
@@ -259,40 +244,71 @@ struct AddApplicationView: View {
 
     private func connector(threshold: AnalysisPhase) -> some View {
         Rectangle()
-            .fill(phase.rawValue >= threshold.rawValue ? Color.awAccent : Color.primary.opacity(0.10))
+            .fill(
+                viewModel.phase.rawValue >= threshold.rawValue && viewModel.phase != .failed
+                    ? Color.awAccent
+                    : Color.primary.opacity(0.10)
+            )
             .frame(height: 2)
             .offset(y: -9)
     }
 
-    private func beginAnalysis() {
-        analysisTask?.cancel()
-        phase = .uploading
-        analysisTask = Task { @MainActor in
-            let sequence: [(AnalysisPhase, UInt64)] = [
-                (.classifying, 650_000_000),
-                (.extracting, 720_000_000),
-                (.matching, 800_000_000),
-                (.completed, 760_000_000)
-            ]
+    private func errorCallout(_ message: String, retry: @escaping () -> Void) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer(minLength: 8)
+            Button("다시 시도", action: retry)
+                .buttonStyle(.borderless)
+                .foregroundStyle(Color.awAccent)
+        }
+        .padding(.horizontal, 13)
+        .frame(maxWidth: 460, minHeight: 42)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
 
-            for (nextPhase, delay) in sequence {
-                try? await Task.sleep(nanoseconds: delay)
-                guard !Task.isCancelled else { return }
-                phase = nextPhase
-            }
-
-            guard let selectedFilename, !Task.isCancelled else { return }
-            let applicationID = store.addImportedApplication(filename: selectedFilename)
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            guard !Task.isCancelled else { return }
-            onCompleted(applicationID)
+    private var sourceIcon: String {
+        switch viewModel.source {
+        case .some(.file): "doc.richtext.fill"
+        case .some(.web): "globe"
+        case .none: "doc.badge.plus"
         }
     }
 
-    private func removeFile() {
-        analysisTask?.cancel()
-        analysisTask = nil
-        selectedFilename = nil
-        phase = .waiting
+    private var sourceKindTitle: String {
+        switch viewModel.source {
+        case .some(.file): "모집요강 파일"
+        case .some(.web): "공고 웹페이지"
+        case .none: "공고 원본"
+        }
+    }
+
+    private var phaseIcon: String {
+        switch viewModel.phase {
+        case .completed: "checkmark"
+        case .failed: "exclamationmark"
+        case .waiting, .uploading, .classifying, .extracting, .matching: "sparkles"
+        }
+    }
+
+    private var phaseTint: Color {
+        switch viewModel.phase {
+        case .completed: .green
+        case .failed: .orange
+        case .waiting, .uploading, .classifying, .extracting, .matching: .awAccent
+        }
+    }
+
+    private func changeSource() {
+        switch viewModel.source {
+        case .some(.file):
+            viewModel.isShowingImporter = true
+        case .some(.web), .none:
+            viewModel.removeSource()
+        }
     }
 }

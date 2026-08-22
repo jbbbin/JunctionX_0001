@@ -1,18 +1,9 @@
 import SwiftUI
 
 struct MyProfileView: View {
-    @EnvironmentObject private var store: AppStore
-    @State private var draft = UserProfile(
-        school: "",
-        enrollmentStatus: "재학",
-        grade: 1,
-        gpa: "",
-        incomeBracket: "미입력",
-        major: "",
-        region: ""
-    )
-    @State private var isEditing = false
-    @State private var didSave = false
+    @ObservedObject var viewModel: ProfileViewModel
+
+    let onOpenDocuments: () -> Void
 
     var body: some View {
         ScrollView {
@@ -25,7 +16,6 @@ struct MyProfileView: View {
             .frame(maxWidth: 920, alignment: .leading)
         }
         .navigationTitle("내 프로필")
-        .onAppear { draft = store.profile }
     }
 
     private var header: some View {
@@ -38,19 +28,11 @@ struct MyProfileView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button {
-                if isEditing {
-                    store.updateProfile(draft)
-                    didSave = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        didSave = false
-                    }
-                } else {
-                    draft = store.profile
-                }
-                isEditing.toggle()
-            } label: {
-                Label(isEditing ? "저장" : "프로필 수정", systemImage: isEditing ? "checkmark" : "pencil")
+            Button(action: viewModel.editOrSave) {
+                Label(
+                    viewModel.isEditing ? "저장" : "프로필 수정",
+                    systemImage: viewModel.isEditing ? "checkmark" : "pencil"
+                )
             }
             .buttonStyle(PrimaryButtonStyle())
         }
@@ -68,34 +50,36 @@ struct MyProfileView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                    Text("현")
+                    Text(viewModel.profile.avatarInitial)
                         .font(.title.weight(.bold))
                         .foregroundStyle(.white)
                 }
                 .frame(width: 64, height: 64)
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("지원자 프로필")
+                    Text(viewModel.profile.name)
                         .font(.title3.weight(.bold))
-                    Text("\(store.profile.school) · \(store.profile.major)")
+                    Text("\(viewModel.profile.school) · \(viewModel.profile.major)")
                         .foregroundStyle(.secondary)
                     HStack(spacing: 8) {
-                        StatusPill(store.profile.enrollmentStatus, icon: "graduationcap.fill", tint: .blue)
+                        StatusPill(
+                            viewModel.profile.enrollmentStatus,
+                            icon: "graduationcap.fill",
+                            tint: .blue
+                        )
                         StatusPill("프로필 자동 재사용", icon: "arrow.triangle.2.circlepath", tint: .green)
                     }
                 }
                 Spacer()
 
-                if didSave {
+                if viewModel.didSave {
                     Label("저장됨", systemImage: "checkmark.circle.fill")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.green)
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
 
-                Button {
-                    store.route = .documents
-                } label: {
+                Button(action: onOpenDocuments) {
                     Label("내 문서함 열기", systemImage: "folder")
                 }
                 .buttonStyle(SecondaryButtonStyle())
@@ -115,75 +99,84 @@ struct MyProfileView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if isEditing {
-                        Button("취소") {
-                            draft = store.profile
-                            isEditing = false
-                        }
+                    if viewModel.isEditing {
+                        Button("취소", action: viewModel.cancelEditing)
                         .buttonStyle(.borderless)
                     }
+                }
+
+                if let validationMessage = viewModel.validationMessage {
+                    Label(validationMessage, systemImage: "exclamationmark.circle.fill")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+                        .background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
                 }
 
                 Divider()
 
                 Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 18) {
                     GridRow {
-                        fieldLabel("학교", icon: "building.columns")
-                        TextField("학교명", text: $draft.school)
+                        fieldLabel("이름", icon: "person")
+                        TextField("이름", text: $viewModel.draft.name)
                             .textFieldStyle(.roundedBorder)
-                            .disabled(!isEditing)
+                            .disabled(!viewModel.isEditing)
+
+                        fieldLabel("지역", icon: "mappin.and.ellipse")
+                        TextField("거주 지역", text: $viewModel.draft.region)
+                            .textFieldStyle(.roundedBorder)
+                            .disabled(!viewModel.isEditing)
+                    }
+
+                    GridRow {
+                        fieldLabel("학교", icon: "building.columns")
+                        TextField("학교명", text: $viewModel.draft.school)
+                            .textFieldStyle(.roundedBorder)
+                            .disabled(!viewModel.isEditing)
 
                         fieldLabel("전공", icon: "books.vertical")
-                        TextField("전공", text: $draft.major)
+                        TextField("전공", text: $viewModel.draft.major)
                             .textFieldStyle(.roundedBorder)
-                            .disabled(!isEditing)
+                            .disabled(!viewModel.isEditing)
                     }
 
                     GridRow {
                         fieldLabel("재학 상태", icon: "person.text.rectangle")
-                        Picker("재학 상태", selection: $draft.enrollmentStatus) {
+                        Picker("재학 상태", selection: $viewModel.draft.enrollmentStatus) {
                             Text("재학").tag("재학")
                             Text("휴학").tag("휴학")
                             Text("졸업 예정").tag("졸업 예정")
                             Text("졸업").tag("졸업")
                         }
                         .labelsHidden()
-                        .disabled(!isEditing)
+                        .disabled(!viewModel.isEditing)
 
                         fieldLabel("학년", icon: "number.circle")
-                        Picker("학년", selection: $draft.grade) {
+                        Picker("학년", selection: $viewModel.draft.grade) {
                             ForEach(1...6, id: \.self) { grade in
                                 Text("\(grade)학년").tag(grade)
                             }
                         }
                         .labelsHidden()
-                        .disabled(!isEditing)
+                        .disabled(!viewModel.isEditing)
                     }
 
                     GridRow {
                         fieldLabel("학점", icon: "chart.line.uptrend.xyaxis")
-                        TextField("예: 3.82", text: $draft.gpa)
+                        TextField("예: 3.82", text: $viewModel.draft.gpa)
                             .textFieldStyle(.roundedBorder)
-                            .disabled(!isEditing)
+                            .disabled(!viewModel.isEditing)
 
                         fieldLabel("소득분위", icon: "chart.pie")
-                        Picker("소득분위", selection: $draft.incomeBracket) {
+                        Picker("소득분위", selection: $viewModel.draft.incomeBracket) {
                             Text("미입력").tag("미입력")
                             ForEach(1...10, id: \.self) { bracket in
                                 Text("\(bracket)분위").tag("\(bracket)분위")
                             }
                         }
                         .labelsHidden()
-                        .disabled(!isEditing)
-                    }
-
-                    GridRow {
-                        fieldLabel("지역", icon: "mappin.and.ellipse")
-                        TextField("거주 지역", text: $draft.region)
-                            .textFieldStyle(.roundedBorder)
-                            .disabled(!isEditing)
-                        Color.clear
-                        Color.clear
+                        .disabled(!viewModel.isEditing)
                     }
                 }
             }

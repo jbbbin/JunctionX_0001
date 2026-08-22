@@ -1,11 +1,13 @@
-import AppKit
 import SwiftUI
 
 struct RootView: View {
-    @EnvironmentObject private var store: AppStore
-    @State private var isPresentingAddApplication = false
-    @State private var pendingImportFilename: String?
-    @State private var searchText = ""
+    @ObservedObject var viewModel: RootViewModel
+    @ObservedObject private var dashboardViewModel: DashboardViewModel
+
+    init(viewModel: RootViewModel) {
+        self.viewModel = viewModel
+        _dashboardViewModel = ObservedObject(wrappedValue: viewModel.dashboardViewModel)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,19 +24,21 @@ struct RootView: View {
             }
         }
         .background(Color.awCanvas)
-        .sheet(isPresented: $isPresentingAddApplication) {
-            AddApplicationView(initialFilename: pendingImportFilename) { applicationID in
-                pendingImportFilename = nil
-                isPresentingAddApplication = false
-                store.route = .application(applicationID)
+        .sheet(
+            isPresented: $viewModel.isPresentingAddApplication,
+            onDismiss: viewModel.dismissAddApplication
+        ) {
+            if let addViewModel = viewModel.addApplicationViewModel {
+                AddApplicationView(viewModel: addViewModel) { applicationID in
+                    viewModel.completeAddApplication(applicationID)
+                }
             }
-            .environmentObject(store)
         }
     }
 
     private var topBar: some View {
         HStack(spacing: 18) {
-            Text(routeTitle)
+            Text(viewModel.routeTitle)
                 .font(.system(size: 15, weight: .bold))
                 .lineLimit(1)
 
@@ -50,11 +54,16 @@ struct RootView: View {
     @ViewBuilder
     private var topBarTrailing: some View {
         if let application = selectedApplication {
-            StatusPill("웹 공고 연결됨", icon: "link", tint: .awAccent)
+            if application.applicationURL != nil {
+                StatusPill("웹 공고 연결됨", icon: "link", tint: .awAccent)
+            } else if application.source.documentURL != nil {
+                StatusPill("원문 파일 연결됨", icon: "doc.fill", tint: .green)
+            } else {
+                StatusPill("원문 미연결", icon: "exclamationmark.triangle", tint: .orange)
+            }
 
             Button {
-                guard let url = application.applicationURL else { return }
-                NSWorkspace.shared.open(url)
+                viewModel.openExternalSource(of: application)
             } label: {
                 Image(systemName: "arrow.up.right")
             }
@@ -64,7 +73,7 @@ struct RootView: View {
 
             Menu {
                 Button {
-                    store.toggleCompletion(applicationID: application.id)
+                    viewModel.toggleCompletion(of: application)
                 } label: {
                     Label(
                         application.isCompleted ? "준비 중으로 변경" : "지원 완료로 표시",
@@ -72,7 +81,7 @@ struct RootView: View {
                     )
                 }
                 Button {
-                    store.route = .applications
+                    viewModel.navigate(to: .applications)
                 } label: {
                     Label("지원 현황으로 이동", systemImage: "rectangle.stack")
                 }
@@ -87,15 +96,15 @@ struct RootView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField("지원 검색", text: $searchText)
+                TextField("지원 검색", text: $dashboardViewModel.searchText)
                     .textFieldStyle(.plain)
                     .font(.subheadline)
                     .onSubmit {
-                        store.route = .applications
+                        viewModel.navigate(to: .applications)
                     }
-                if !searchText.isEmpty {
+                if !dashboardViewModel.searchText.isEmpty {
                     Button {
-                        searchText = ""
+                        dashboardViewModel.clearSearch()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
@@ -112,7 +121,7 @@ struct RootView: View {
             )
 
             Button {
-                presentAddApplication()
+                viewModel.presentAddApplication()
             } label: {
                 Label("새 지원", systemImage: "plus")
                     .frame(minWidth: 126)
@@ -149,7 +158,7 @@ struct RootView: View {
                 sidebarButton("지원 현황", icon: "rectangle.stack", route: .applications)
                 sidebarButton("문서 보관함", icon: "folder", route: .documents)
                 sidebarButton("내 프로필", icon: "person", route: .profile)
-                sidebarButton("보관됨", icon: "archivebox", route: .archive)
+                sidebarButton("완료됨", icon: "checkmark.seal", route: .archive)
             }
             .padding(.horizontal, 14)
 
@@ -179,7 +188,7 @@ struct RootView: View {
                     .font(.system(size: 21, weight: .bold, design: .rounded))
                 Spacer()
                 Button {
-                    store.route = .applications
+                    viewModel.navigate(to: .applications)
                 } label: {
                     Image(systemName: "magnifyingglass")
                 }
@@ -204,23 +213,23 @@ struct RootView: View {
                         .foregroundStyle(.secondary)
                         .padding(.top, 20)
 
-                    ForEach(store.applications.filter { !$0.isCompleted }) { application in
+                    ForEach(viewModel.activeApplications) { application in
                         applicationSidebarRow(application, isSelected: application.id == selectedApplication.id)
                     }
 
-                    Text("보관됨")
+                    Text("완료됨")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                         .padding(.top, 20)
 
-                    if store.applications.allSatisfy({ !$0.isCompleted }) {
-                        Text("보관된 지원이 없습니다")
+                    if viewModel.completedApplications.isEmpty {
+                        Text("완료된 지원이 없습니다")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)
                     } else {
-                        ForEach(store.applications.filter(\.isCompleted)) { application in
+                        ForEach(viewModel.completedApplications) { application in
                             applicationSidebarRow(application, isSelected: application.id == selectedApplication.id)
                         }
                     }
@@ -229,7 +238,7 @@ struct RootView: View {
             }
 
             Button {
-                presentAddApplication()
+                viewModel.presentAddApplication()
             } label: {
                 Label("새 지원", systemImage: "plus")
                     .frame(maxWidth: .infinity)
@@ -242,7 +251,7 @@ struct RootView: View {
 
     private func applicationSidebarRow(_ application: ApplicationItem, isSelected: Bool) -> some View {
         Button {
-            store.route = .application(application.id)
+            viewModel.navigate(to: .application(application.id))
         } label: {
             HStack(alignment: .top, spacing: 8) {
                 Circle()
@@ -278,7 +287,7 @@ struct RootView: View {
     private func sidebarButton(_ title: String, icon: String, route: SidebarRoute) -> some View {
         Button {
             withAnimation(.easeOut(duration: 0.16)) {
-                store.route = route
+                viewModel.navigate(to: route)
             }
         } label: {
             HStack(spacing: 11) {
@@ -286,14 +295,14 @@ struct RootView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .frame(width: 18)
                 Text(title)
-                    .font(.system(size: 15, weight: store.route == route ? .bold : .medium))
+                    .font(.system(size: 15, weight: viewModel.route == route ? .bold : .medium))
                 Spacer()
             }
-            .foregroundStyle(store.route == route ? Color.awAccent : Color.primary.opacity(0.80))
+            .foregroundStyle(viewModel.route == route ? Color.awAccent : Color.primary.opacity(0.80))
             .padding(.horizontal, 14)
             .frame(height: 44)
             .background(
-                store.route == route ? Color.awAccentSoft : Color.clear,
+                viewModel.route == route ? Color.awAccentSoft : Color.clear,
                 in: RoundedRectangle(cornerRadius: 10, style: .continuous)
             )
         }
@@ -302,67 +311,33 @@ struct RootView: View {
 
     @ViewBuilder
     private var detail: some View {
-        switch store.route {
+        switch viewModel.route {
         case .dashboard, .applications, .archive, .urgent, .needsReview:
             DashboardView(
-                searchText: $searchText,
-                statusFilter: dashboardFilter,
+                viewModel: dashboardViewModel,
                 onImport: { url in
-                    presentAddApplication(filename: url.lastPathComponent)
+                    viewModel.presentAddApplication(source: .file(url))
                 },
-                onShowAll: {
-                    searchText = ""
-                    store.route = .applications
-                }
+                onAddURL: { viewModel.presentAddApplication() },
+                onOpenApplication: { viewModel.navigate(to: .application($0)) },
+                onShowAll: viewModel.showAllApplications
             )
         case .profile:
-            MyProfileView()
+            MyProfileView(
+                viewModel: viewModel.profileViewModel,
+                onOpenDocuments: { viewModel.navigate(to: .documents) }
+            )
         case .documents:
-            MyDocumentsView()
+            MyDocumentsView(viewModel: viewModel.documentsViewModel)
         case let .application(id):
-            ApplicationWorkspaceView(applicationID: id)
+            ApplicationWorkspaceView(
+                viewModel: viewModel.workspaceViewModel(for: id),
+                onReturnToApplications: { viewModel.navigate(to: .applications) }
+            )
         }
-    }
-
-    private var dashboardFilter: DashboardStatusFilter {
-        switch store.route {
-        case .archive:
-            .completed
-        case .urgent:
-            .urgent
-        case .needsReview:
-            .needsReview
-        case .dashboard, .applications, .profile, .documents, .application:
-            .all
-        }
-    }
-
-    private var routeTitle: String {
-        switch store.route {
-        case .dashboard, .applications:
-            "지원 현황"
-        case .documents:
-            "문서 보관함"
-        case .profile:
-            "내 프로필"
-        case .archive:
-            "보관됨"
-        case .urgent:
-            "마감 임박"
-        case .needsReview:
-            "확인 필요"
-        case let .application(id):
-            store.application(id: id)?.title ?? "지원 상세"
-        }
-    }
-
-    private func presentAddApplication(filename: String? = nil) {
-        pendingImportFilename = filename
-        isPresentingAddApplication = true
     }
 
     private var selectedApplication: ApplicationItem? {
-        guard case let .application(id) = store.route else { return nil }
-        return store.application(id: id)
+        viewModel.selectedApplication
     }
 }

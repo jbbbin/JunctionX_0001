@@ -39,7 +39,7 @@ MVP에서는 위 세 분야만 지원한다. 다른 분야는 확장 범위로 �
 DashboardView
 ├── ApplicationCardView
 │   └── ApplicationWorkspaceView
-│       └── NoticeViewerView
+│       └── SourcePreviewView (PDF / Image / Web)
 ├── AddApplicationView
 │   ├── AnalysisProgressState
 │   └── ApplicationWorkspaceView
@@ -85,7 +85,8 @@ DashboardView
 
   Feature             설명                                      우선순위
   ------------------- ----------------------------------------- ----------
-  PDF 선택            Files에서 모집요강 선택                    P0
+  PDF·이미지 선택     Files에서 모집요강 선택                    P0
+  공고 URL 입력       웹 공고 주소로 즉시 분석 시작              P0
   Storage 업로드      Firebase Storage에 사용자별 경로로 저장     P0
   즉시 분석 시작      업로드 완료 후 별도 버튼 없이 함수 실행     P0
   분야 자동 분류      채용 / 장학금 / 공모전·대회 자동 판별      P0
@@ -210,16 +211,19 @@ Cloud Functions가 Studio 결과를 공통 `ApplicationRequirement` 구조와 �
 
 자동 제출은 MVP에서 제외한다.
 
-### 6.5 NoticeViewerView
+### 6.5 SourcePreviewView
 
-**목적:** AI가 추출한 요약과 모집요강 원문을 같은 흐름에서 검증한다.
+**목적:** 준비 목록과 PDF 또는 웹 공고 원문을 듀얼 뷰에서 함께 검증한다.
 
   Feature             설명                                  우선순위
   ------------------- ------------------------------------- ----------
-  PDF 원문 표시       앱 내부에서 모집요강 확인             P1
+  PDF·이미지 원문 표시 앱 내부에서 모집요강 확인            P1
   페이지 이동         이전 / 다음 및 페이지 번호 이동       P1
   확대 / 축소         작은 글자와 표 확인                    P1
   판정 근거 이동      조건 선택 시 관련 원문 위치로 이동     P1
+  웹 주소 탐색        주소창에서 URL 또는 검색어로 이동       P1
+  새 창 링크 처리     팝업 링크를 현재 내부 웹 탭에서 표시    P1
+  로드 실패 처리      오류 안내와 다시 시도 제공              P1
   추출 영역 강조      일정 / 조건 / 서류 원문 하이라이트     P2
   텍스트 선택 / 복사  원문 텍스트 재사용                     P2
 
@@ -291,7 +295,7 @@ MVP에서는 모든 개인정보를 모델링하지 않고 **실제 데모 모�
   Firebase App Check         정상 앱에서 발생한 요청인지 검증           P1
   Budget Alert               Blaze 요금제 사용량 모니터링                P0
 
-Upstage API 키는 iOS 앱, Git 저장소와 일반 `.env` 파일에 저장하지 않는다.
+Upstage API 키는 macOS 앱, Git 저장소와 일반 `.env` 파일에 저장하지 않는다.
 Cloud Functions에서 Secret Manager에 등록된 키만 사용한다.
 
 ### 9.2 처리 상태
@@ -348,7 +352,7 @@ users/{userId}
 
 ### Phase 0 --- Firebase 기반 구성
 
--   Firebase iOS SDK 연결
+-   Firebase Apple SDK 연결
 -   Firebase Authentication 적용
 -   Storage·Firestore 데이터 구조 및 Security Rules 작성
 -   Cloud Functions 2nd gen 생성
@@ -360,7 +364,7 @@ users/{userId}
 
 `Storage 업로드 → Cloud Functions → Upstage Studio → Firestore → ApplicationWorkspaceView`
 
--   PDF 업로드 1회로 자동 분석 시작
+-   PDF·이미지 업로드 또는 URL 등록 1회로 자동 분석 시작
 -   채용 / 장학금 / 공모전·대회 자동 분류
 -   공통 및 분야별 정보 추출
 -   원문 근거와 확인 필요 상태 생성
@@ -399,7 +403,7 @@ users/{userId}
 
 -   상태 필터
 -   모집요강 원문 근거 표시
--   PDF 원문 뷰어와 페이지 이동
+-   PDF·이미지 원문 뷰어와 PDF 페이지 이동
 -   마감 임박 강조
 -   Drag & Drop
 -   이미지 모집요강 업로드

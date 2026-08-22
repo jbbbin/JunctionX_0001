@@ -2,12 +2,17 @@ import SwiftUI
 
 @main
 struct ApplicationWorkspaceApp: App {
-    @StateObject private var store = AppStore()
+    @StateObject private var viewModel: RootViewModel
+
+    init() {
+        _viewModel = StateObject(
+            wrappedValue: RootViewModel(dependencies: .prototype())
+        )
+    }
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(store)
+            RootView(viewModel: viewModel)
                 .preferredColorScheme(.light)
                 .frame(minWidth: 1120, minHeight: 760)
         }

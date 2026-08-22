@@ -1,9 +1,8 @@
+import Combine
 import Foundation
-import SwiftUI
 
 @MainActor
 final class AppStore: ObservableObject {
-    @Published var route: SidebarRoute = .dashboard
     @Published var applications: [ApplicationItem]
     @Published var profile: UserProfile
     @Published var ownedDocuments: [OwnedDocument]
@@ -24,15 +23,23 @@ final class AppStore: ObservableObject {
             OwnedDocument(name: "성적증명서", type: "성적", filename: "성적증명서_2026.pdf"),
             OwnedDocument(name: "주민등록등본", type: "신원", filename: "주민등록등본.pdf")
         ]
+        reconcileOwnedDocuments()
     }
 
     func application(id: UUID) -> ApplicationItem? {
         applications.first { $0.id == id }
     }
 
+    @discardableResult
+    func addApplication(_ application: ApplicationItem) -> UUID {
+        applications.insert(application, at: 0)
+        reconcileOwnedDocuments()
+        return application.id
+    }
+
     func toggleCompletion(applicationID: UUID) {
         guard let index = applications.firstIndex(where: { $0.id == applicationID }) else { return }
-        applications[index].isCompleted.toggle()
+        applications[index].status = applications[index].isCompleted ? .preparing : .submitted
     }
 
     func toggleDocumentReady(applicationID: UUID, documentID: UUID) {
@@ -41,21 +48,61 @@ final class AppStore: ObservableObject {
         else { return }
 
         applications[applicationIndex].requiredDocuments[documentIndex].isReady.toggle()
-        updateNextAction(for: applicationIndex)
     }
 
     func linkDocument(
         applicationID: UUID,
         documentID: UUID,
-        filename: String
+        url: URL
     ) {
         guard let applicationIndex = applications.firstIndex(where: { $0.id == applicationID }),
               let documentIndex = applications[applicationIndex].requiredDocuments.firstIndex(where: { $0.id == documentID })
         else { return }
 
+        let filename = url.lastPathComponent
         applications[applicationIndex].requiredDocuments[documentIndex].linkedFilename = filename
+        applications[applicationIndex].requiredDocuments[documentIndex].linkedFileURL = url
         applications[applicationIndex].requiredDocuments[documentIndex].isReady = true
-        updateNextAction(for: applicationIndex)
+
+        if !ownedDocuments.contains(where: { $0.fileURL == url || $0.filename == filename }) {
+            let name = url.deletingPathExtension().lastPathComponent
+            ownedDocuments.insert(
+                OwnedDocument(
+                    name: name,
+                    type: inferredDocumentType(from: name),
+                    filename: filename,
+                    fileURL: url
+                ),
+                at: 0
+            )
+        }
+    }
+
+    func markDocumentRequested(applicationID: UUID, documentID: UUID) {
+        guard let applicationIndex = applications.firstIndex(where: { $0.id == applicationID }),
+              let documentIndex = applications[applicationIndex].requiredDocuments.firstIndex(where: { $0.id == documentID })
+        else { return }
+
+        applications[applicationIndex].requiredDocuments[documentIndex].requestState = .requested
+        applications[applicationIndex].requiredDocuments[documentIndex].isReady = false
+    }
+
+    func markDocumentReceived(applicationID: UUID, documentID: UUID) {
+        guard let applicationIndex = applications.firstIndex(where: { $0.id == applicationID }),
+              let documentIndex = applications[applicationIndex].requiredDocuments.firstIndex(where: { $0.id == documentID })
+        else { return }
+
+        applications[applicationIndex].requiredDocuments[documentIndex].requestState = .received
+        applications[applicationIndex].requiredDocuments[documentIndex].isReady = true
+    }
+
+    func resetDocumentRequest(applicationID: UUID, documentID: UUID) {
+        guard let applicationIndex = applications.firstIndex(where: { $0.id == applicationID }),
+              let documentIndex = applications[applicationIndex].requiredDocuments.firstIndex(where: { $0.id == documentID })
+        else { return }
+
+        applications[applicationIndex].requiredDocuments[documentIndex].requestState = .notRequested
+        applications[applicationIndex].requiredDocuments[documentIndex].isReady = false
     }
 
     func updateProfile(_ newProfile: UserProfile) {
@@ -74,21 +121,55 @@ final class AppStore: ObservableObject {
             ),
             at: 0
         )
+        reconcileOwnedDocuments()
     }
 
     func replaceOwnedDocument(id: UUID, with url: URL) {
         guard let index = ownedDocuments.firstIndex(where: { $0.id == id }) else { return }
+        let previousFilename = ownedDocuments[index].filename
         ownedDocuments[index].filename = url.lastPathComponent
         ownedDocuments[index].fileURL = url
         ownedDocuments[index].addedAt = Date()
+
+        for applicationIndex in applications.indices {
+            for documentIndex in applications[applicationIndex].requiredDocuments.indices
+            where applications[applicationIndex].requiredDocuments[documentIndex].linkedFilename == previousFilename {
+                applications[applicationIndex].requiredDocuments[documentIndex].linkedFilename = url.lastPathComponent
+                applications[applicationIndex].requiredDocuments[documentIndex].linkedFileURL = url
+            }
+        }
     }
 
     func deleteOwnedDocument(id: UUID) {
+        guard let document = ownedDocuments.first(where: { $0.id == id }) else { return }
         ownedDocuments.removeAll { $0.id == id }
+
+        for applicationIndex in applications.indices {
+            for documentIndex in applications[applicationIndex].requiredDocuments.indices
+            where applications[applicationIndex].requiredDocuments[documentIndex].linkedFilename == document.filename {
+                applications[applicationIndex].requiredDocuments[documentIndex].linkedFilename = nil
+                applications[applicationIndex].requiredDocuments[documentIndex].linkedFileURL = nil
+                applications[applicationIndex].requiredDocuments[documentIndex].isReady = false
+            }
+        }
     }
 
     @discardableResult
-    func addImportedApplication(filename: String) -> UUID {
+    func addImportedApplication(source importedSource: ImportedSource) -> UUID {
+        let source: ApplicationSource
+        switch importedSource {
+        case let .file(url):
+            source = ApplicationSource(
+                documentURL: url,
+                displayName: url.lastPathComponent
+            )
+        case let .web(url):
+            source = ApplicationSource(
+                webURL: url,
+                displayName: url.host() ?? url.absoluteString
+            )
+        }
+
         let application = ApplicationItem(
             category: .employment,
             title: "AI가 분석한 새 지원 공고",
@@ -119,27 +200,34 @@ final class AppStore: ObservableObject {
                 RequiredDocument(name: "지원서", preparationType: .write),
                 RequiredDocument(name: "추천서", preparationType: .request)
             ],
-            nextAction: "경력 조건을 확인해 주세요",
-            applicationURL: URL(string: "https://example.com/apply"),
-            sourceFilename: filename
+            source: source
         )
-        applications.insert(application, at: 0)
-        return application.id
+        return addApplication(application)
     }
 
-    private func updateNextAction(for applicationIndex: Int) {
-        if let next = applications[applicationIndex].requiredDocuments.first(where: { !$0.isReady }) {
-            switch next.preparationType {
-            case .owned:
-                applications[applicationIndex].nextAction = "\(next.name) 파일을 연결해 주세요"
-            case .write:
-                applications[applicationIndex].nextAction = "\(next.name)을 작성해 주세요"
-            case .request:
-                applications[applicationIndex].nextAction = "\(next.name)을 요청해 주세요"
+    private func reconcileOwnedDocuments() {
+        for applicationIndex in applications.indices {
+            for documentIndex in applications[applicationIndex].requiredDocuments.indices {
+                let required = applications[applicationIndex].requiredDocuments[documentIndex]
+                guard !required.isReady,
+                      required.preparationType == .owned,
+                      let owned = ownedDocuments.first(where: {
+                          normalizedDocumentName($0.name) == normalizedDocumentName(required.name)
+                      })
+                else { continue }
+
+                applications[applicationIndex].requiredDocuments[documentIndex].linkedFilename = owned.filename
+                applications[applicationIndex].requiredDocuments[documentIndex].linkedFileURL = owned.fileURL
+                applications[applicationIndex].requiredDocuments[documentIndex].isReady = true
             }
-        } else {
-            applications[applicationIndex].nextAction = "공식 접수처에서 제출해 주세요"
         }
+    }
+
+    private func normalizedDocumentName(_ name: String) -> String {
+        name
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "_", with: "")
+            .lowercased()
     }
 
     private func inferredDocumentType(from name: String) -> String {
@@ -153,6 +241,10 @@ final class AppStore: ObservableObject {
         Calendar.current.date(byAdding: .day, value: days, to: Date()) ?? Date()
     }
 
+    private static func webEvidence(_ address: String) -> EvidenceReference {
+        EvidenceReference(location: .web(url: URL(string: address)))
+    }
+
     private static let sampleApplications: [ApplicationItem] = [
         ApplicationItem(
             category: .employment,
@@ -161,9 +253,9 @@ final class AppStore: ObservableObject {
             deadline: date(daysFromNow: 4),
             eligibility: .eligible,
             requirements: [
-                EligibilityRequirement(title: "학력", detail: "2027년 2월 이전 졸업 예정자", state: .satisfied, sourcePage: 2),
-                EligibilityRequirement(title: "전공", detail: "전공 무관", state: .satisfied, sourcePage: 2),
-                EligibilityRequirement(title: "근무 가능 시점", detail: "2026년 11월부터 근무 가능", state: .needsReview, sourcePage: 4)
+                EligibilityRequirement(title: "학력", detail: "2027년 2월 이전 졸업 예정자", state: .satisfied, evidence: webEvidence("https://www.skcareers.com")),
+                EligibilityRequirement(title: "전공", detail: "전공 무관", state: .satisfied, evidence: webEvidence("https://www.skcareers.com")),
+                EligibilityRequirement(title: "근무 가능 시점", detail: "2026년 11월부터 근무 가능", state: .needsReview, evidence: webEvidence("https://www.skcareers.com"))
             ],
             requiredDocuments: [
                 RequiredDocument(name: "지원서", preparationType: .write, isReady: true, linkedFilename: "SKT_지원서_v2.pdf"),
@@ -172,9 +264,10 @@ final class AppStore: ObservableObject {
                 RequiredDocument(name: "포트폴리오", preparationType: .write),
                 RequiredDocument(name: "추천서", preparationType: .request)
             ],
-            nextAction: "포트폴리오를 연결해 주세요",
-            applicationURL: URL(string: "https://www.skcareers.com"),
-            sourceFilename: "SKT_2026_신입채용.pdf"
+            source: ApplicationSource(
+                webURL: URL(string: "https://www.skcareers.com"),
+                displayName: "SKT_2026_신입채용.pdf"
+            )
         ),
         ApplicationItem(
             category: .scholarship,
@@ -183,9 +276,9 @@ final class AppStore: ObservableObject {
             deadline: date(daysFromNow: 7),
             eligibility: .needsReview,
             requirements: [
-                EligibilityRequirement(title: "재학 상태", detail: "국내 대학 정규학기 재학생", state: .satisfied, sourcePage: 1),
-                EligibilityRequirement(title: "성적", detail: "직전 학기 3.5 / 4.5 이상", state: .satisfied, sourcePage: 2),
-                EligibilityRequirement(title: "소득분위", detail: "7분위 이하", state: .needsReview, sourcePage: 2)
+                EligibilityRequirement(title: "재학 상태", detail: "국내 대학 정규학기 재학생", state: .satisfied, evidence: webEvidence("https://example.com/scholarship")),
+                EligibilityRequirement(title: "성적", detail: "직전 학기 3.5 / 4.5 이상", state: .satisfied, evidence: webEvidence("https://example.com/scholarship")),
+                EligibilityRequirement(title: "소득분위", detail: "7분위 이하", state: .needsReview, evidence: webEvidence("https://example.com/scholarship"))
             ],
             requiredDocuments: [
                 RequiredDocument(name: "주민등록등본", preparationType: .owned, isReady: true, linkedFilename: "주민등록등본.pdf"),
@@ -194,9 +287,10 @@ final class AppStore: ObservableObject {
                 RequiredDocument(name: "자기소개서", preparationType: .write),
                 RequiredDocument(name: "추천서", preparationType: .request)
             ],
-            nextAction: "소득분위 정보를 확인해 주세요",
-            applicationURL: URL(string: "https://example.com/scholarship"),
-            sourceFilename: "미래인재_장학금_모집요강.pdf"
+            source: ApplicationSource(
+                webURL: URL(string: "https://example.com/scholarship"),
+                displayName: "미래인재_장학금_모집요강.pdf"
+            )
         ),
         ApplicationItem(
             category: .competition,
@@ -205,17 +299,18 @@ final class AppStore: ObservableObject {
             deadline: date(daysFromNow: 12),
             eligibility: .eligible,
             requirements: [
-                EligibilityRequirement(title: "참가 형태", detail: "개인 지원 후 현장 팀 빌딩 가능", state: .satisfied, sourcePage: 1),
-                EligibilityRequirement(title: "연령", detail: "만 18세 이상", state: .satisfied, sourcePage: 1)
+                EligibilityRequirement(title: "참가 형태", detail: "개인 지원 후 현장 팀 빌딩 가능", state: .satisfied, evidence: webEvidence("https://www.junction.com")),
+                EligibilityRequirement(title: "연령", detail: "만 18세 이상", state: .satisfied, evidence: webEvidence("https://www.junction.com"))
             ],
             requiredDocuments: [
                 RequiredDocument(name: "참가 신청서", preparationType: .write, isReady: true, linkedFilename: "JunctionX_신청서.pdf"),
                 RequiredDocument(name: "GitHub 프로필", preparationType: .write, isReady: true, linkedFilename: "github.com/hyeonpaper"),
                 RequiredDocument(name: "아이디어 소개", preparationType: .write)
             ],
-            nextAction: "아이디어 소개를 작성해 주세요",
-            applicationURL: URL(string: "https://www.junction.com"),
-            sourceFilename: "JunctionX_Seoul_2026.pdf"
+            source: ApplicationSource(
+                webURL: URL(string: "https://www.junction.com"),
+                displayName: "JunctionX_Seoul_2026.pdf"
+            )
         )
     ]
 }
