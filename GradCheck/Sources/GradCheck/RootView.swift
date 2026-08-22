@@ -9,8 +9,10 @@ struct RootView: View {
                 .navigationSplitViewColumnWidth(min: 220, ideal: 252, max: 285)
         } detail: {
             VStack(spacing: 0) {
-                WorkspaceHeader()
-                Divider().opacity(0.55)
+                if state.destination != .documents || state.documentsRoute == .detail {
+                    WorkspaceHeader()
+                    Divider().opacity(0.55)
+                }
                 destinationView
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }

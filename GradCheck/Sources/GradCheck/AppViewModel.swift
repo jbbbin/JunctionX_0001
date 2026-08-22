@@ -3,7 +3,8 @@ import SwiftUI
 
 @MainActor
 final class AppViewModel: ObservableObject {
-    @Published var destination: AppDestination = .overview
+    @Published var destination: AppDestination = .documents
+    @Published private(set) var documentsRoute: DocumentsRoute = .list
     @Published private(set) var portfolio: ApplicationPortfolio
     @Published var selectedFindingID: UUID?
     @Published var isAuditing = false
@@ -102,8 +103,23 @@ final class AppViewModel: ObservableObject {
         guard updated.select(id) else { return }
         portfolio = updated
         selectedFindingID = findings.first(where: { $0.status == .blocked })?.id ?? findings.first?.id
-        destination = .overview
         persist()
+    }
+
+    func showWorkspaceList() {
+        destination = .documents
+        documentsRoute = .list
+    }
+
+    func showWorkspaceDocuments(_ id: UUID) {
+        selectWorkspace(id)
+        destination = .documents
+        documentsRoute = .detail
+    }
+
+    func showSelectedWorkspaceDocuments() {
+        destination = .documents
+        documentsRoute = .detail
     }
 
     func saveUpstageAPIKey(_ value: String) throws {
@@ -139,7 +155,7 @@ final class AppViewModel: ObservableObject {
 
         if deletingSelectedWorkspace {
             selectedFindingID = findings.first(where: { $0.status == .blocked })?.id ?? findings.first?.id
-            destination = .overview
+            showWorkspaceList()
         }
         successMessage = "\(deletedWorkspace.school) 지원 항목을 삭제했어요."
         persist()
@@ -230,7 +246,7 @@ final class AppViewModel: ObservableObject {
         updated.upsert(session, select: true)
         portfolio = updated
         selectedFindingID = nil
-        destination = .documents
+        showSelectedWorkspaceDocuments()
         showNewWorkspace = false
         successMessage = "모집요강에서 필요한 서류를 정리했어요."
         persist()
@@ -245,7 +261,7 @@ final class AppViewModel: ObservableObject {
         updated.upsert(demo, select: true)
         portfolio = updated
         selectedFindingID = findings.first(where: { $0.status == .blocked })?.id
-        destination = .overview
+        showSelectedWorkspaceDocuments()
         showNewWorkspace = false
         successMessage = "샘플 지원서를 불러왔어요."
         persist()

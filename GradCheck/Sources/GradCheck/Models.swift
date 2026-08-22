@@ -19,6 +19,11 @@ enum AppDestination: String, CaseIterable, Identifiable {
     }
 }
 
+enum DocumentsRoute: Equatable {
+    case list
+    case detail
+}
+
 enum ReviewStatus: String, Codable, CaseIterable, Identifiable {
     case blocked = "BLOCKED"
     case humanReview = "HUMAN REVIEW"

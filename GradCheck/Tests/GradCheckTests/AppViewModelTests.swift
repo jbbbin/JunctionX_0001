@@ -284,8 +284,26 @@ final class AppViewModelTests: XCTestCase {
 
         XCTAssertEqual(state.workspaces.count, 1)
         XCTAssertEqual(state.selectedWorkspaceID, sampleID)
-        XCTAssertEqual(state.destination, .overview)
+        XCTAssertEqual(state.destination, .documents)
+        XCTAssertEqual(state.documentsRoute, .list)
         XCTAssertFalse(state.workspaces.contains { $0.id == deletingID })
+    }
+
+    func testDocumentNavigationStartsAtListAndOpensSelectedWorkspaceDetail() {
+        let state = AppViewModel(loadSavedState: false, environment: [:])
+        let workspaceID = state.selectedWorkspaceID
+
+        XCTAssertEqual(state.destination, .documents)
+        XCTAssertEqual(state.documentsRoute, .list)
+
+        state.showWorkspaceDocuments(workspaceID)
+
+        XCTAssertEqual(state.destination, .documents)
+        XCTAssertEqual(state.documentsRoute, .detail)
+
+        state.showWorkspaceList()
+
+        XCTAssertEqual(state.documentsRoute, .list)
     }
 
     func testDeletingLastWorkspaceIsRejected() {

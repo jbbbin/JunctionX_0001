@@ -62,7 +62,7 @@ struct OverviewView: View {
                             if state.requirements.isEmpty || state.requiredDocumentTypes.isEmpty {
                                 state.destination = .requirements
                             } else if state.readyDocumentCount < state.requiredDocumentCount {
-                                state.destination = .documents
+                                state.showSelectedWorkspaceDocuments()
                             } else if !state.hasCurrentAudit {
                                 state.runAudit()
                             } else if state.blockedCount > 0 || state.humanReviewCount > 0 {
@@ -78,7 +78,7 @@ struct OverviewView: View {
                         .foregroundStyle(GCTheme.brand)
 
                         Button("지원 서류 보기") {
-                            state.destination = .documents
+                            state.showSelectedWorkspaceDocuments()
                         }
                         .buttonStyle(.bordered)
                         .tint(.white.opacity(0.9))
@@ -288,7 +288,7 @@ struct OverviewView: View {
                         }
                     }
                 }
-                Button("서류 관리") { state.destination = .documents }
+                Button("서류 관리") { state.showSelectedWorkspaceDocuments() }
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }

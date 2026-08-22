@@ -20,7 +20,7 @@ struct AuditReportView: View {
                     title: "아직 검수 결과가 없어요",
                     message: "지원 서류를 추가한 뒤 지원 패키지 검수를 실행하세요.",
                     actionTitle: "지원 서류로 이동",
-                    action: { state.destination = .documents }
+                    action: { state.showSelectedWorkspaceDocuments() }
                 )
             } else {
                 HStack(spacing: 0) {
@@ -330,7 +330,7 @@ private struct FindingDetailView: View {
                     Spacer()
                     if finding.status != .ready {
                         Button {
-                            state.destination = .documents
+                            state.showSelectedWorkspaceDocuments()
                         } label: {
                             Label("파일 교체", systemImage: "arrow.triangle.2.circlepath")
                         }
