@@ -10,8 +10,12 @@ struct SidebarView: View {
                 .padding(.top, 18)
                 .padding(.bottom, 20)
 
-            supportDocumentsButton
-                .padding(.horizontal, 10)
+            VStack(spacing: 4) {
+                navigationButton(.overview)
+                supportDocumentsButton
+                navigationButton(.audit)
+            }
+            .padding(.horizontal, 10)
 
             Spacer(minLength: 16)
 
@@ -26,25 +30,52 @@ struct SidebarView: View {
     }
 
     private var supportDocumentsButton: some View {
-        Button {
+        let isSelected = state.destination == .documents || state.destination == .requirements
+
+        return Button {
             state.showWorkspaceList()
         } label: {
-            HStack(spacing: 11) {
-                Image(systemName: AppDestination.documents.symbol)
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 20)
-                Text(AppDestination.documents.rawValue)
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-            }
-            .foregroundStyle(GCTheme.brand)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .gcSidebarTab(selected: true)
+            navigationLabel(for: .documents, isSelected: isSelected)
+                .gcSidebarTab(selected: isSelected)
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(.isSelected)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func navigationButton(_ destination: AppDestination) -> some View {
+        let isSelected = state.destination == destination
+
+        return Button {
+            state.destination = destination
+        } label: {
+            navigationLabel(for: destination, isSelected: isSelected)
+                .gcSidebarTab(selected: isSelected)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func navigationLabel(for destination: AppDestination, isSelected: Bool) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: destination.symbol)
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 20)
+            Text(destination.rawValue)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+            Spacer()
+            if destination == .audit && state.blockedCount > 0 {
+                Text("\(state.blockedCount)")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 19, minHeight: 19)
+                    .background(ReviewStatus.blocked.color)
+                    .clipShape(Circle())
+            }
+        }
+        .foregroundStyle(isSelected ? GCTheme.brand : GCTheme.secondaryInk)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var brand: some View {
