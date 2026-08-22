@@ -9,74 +9,12 @@ struct SidebarView: View {
             brand
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
-                .padding(.bottom, 24)
-
-            Text("APPLICATION")
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .tracking(1.15)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 19)
-                .padding(.bottom, 8)
-
-            ScrollView {
-                LazyVStack(spacing: 6) {
-                    ForEach(state.workspaces) { workspace in
-                        applicationCard(workspace)
-                    }
-                }
-                .padding(.horizontal, 10)
-            }
-            .scrollIndicators(.hidden)
-            .frame(maxHeight: 230)
-
-            Button {
-                state.showNewWorkspace = true
-            } label: {
-                Label("새 지원 목표", systemImage: "plus")
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(GCTheme.brand)
-            .padding(.horizontal, 10)
-            .padding(.top, 3)
-
-            Divider()
-                .padding(.horizontal, 18)
-                .padding(.vertical, 16)
+                .padding(.bottom, 20)
 
             VStack(spacing: 4) {
-                ForEach(AppDestination.allCases) { destination in
-                    Button {
-                        state.destination = destination
-                    } label: {
-                        HStack(spacing: 11) {
-                            Image(systemName: destination.symbol)
-                                .font(.system(size: 14, weight: .medium))
-                                .frame(width: 20)
-                            Text(destination.rawValue)
-                                .font(.system(size: 13, weight: state.destination == destination ? .semibold : .medium))
-                            Spacer()
-                            if destination == .audit && state.blockedCount > 0 {
-                                Text("\(state.blockedCount)")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .frame(minWidth: 19, minHeight: 19)
-                                    .background(ReviewStatus.blocked.color)
-                                    .clipShape(Circle())
-                            }
-                        }
-                        .foregroundStyle(state.destination == destination ? GCTheme.brand : GCTheme.secondaryInk)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .gcSidebarTab(selected: state.destination == destination)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(state.destination == destination ? .isSelected : [])
-                }
+                navigationButton(.overview)
+                supportDocumentsGroup
+                navigationButton(.audit)
             }
             .padding(.horizontal, 10)
 
@@ -108,6 +46,80 @@ struct SidebarView: View {
         }
     }
 
+    private var supportDocumentsGroup: some View {
+        VStack(spacing: 4) {
+            navigationButton(.documents)
+
+            VStack(spacing: 4) {
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        ForEach(state.workspaces) { workspace in
+                            applicationCard(workspace)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                    .padding(.trailing, 2)
+                }
+                .scrollIndicators(.hidden)
+                .frame(maxHeight: 230)
+
+                Button {
+                    state.showNewWorkspace = true
+                } label: {
+                    Label("새 지원 목표", systemImage: "plus")
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(GCTheme.brand)
+            }
+            .padding(.leading, 18)
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(GCTheme.secondaryInk.opacity(0.12))
+                    .frame(width: 1)
+                    .padding(.leading, 9)
+                    .padding(.vertical, 4)
+            }
+        }
+    }
+
+    private func navigationButton(_ destination: AppDestination) -> some View {
+        let isSelected = destination == .documents
+            ? state.destination == .documents || state.destination == .requirements
+            : state.destination == destination
+
+        return Button {
+            state.destination = destination
+        } label: {
+            HStack(spacing: 11) {
+                Image(systemName: destination.symbol)
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 20)
+                Text(destination.rawValue)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                Spacer()
+                if destination == .audit && state.blockedCount > 0 {
+                    Text("\(state.blockedCount)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 19, minHeight: 19)
+                        .background(ReviewStatus.blocked.color)
+                        .clipShape(Circle())
+                }
+            }
+            .foregroundStyle(isSelected ? GCTheme.brand : GCTheme.secondaryInk)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .gcSidebarTab(selected: isSelected)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
     private var brand: some View {
         HStack(spacing: 10) {
             ZStack {
@@ -135,7 +147,7 @@ struct SidebarView: View {
         return ZStack(alignment: .topTrailing) {
             Button {
                 state.selectWorkspace(workspace.id)
-                state.destination = .overview
+                state.destination = .documents
             } label: {
                 VStack(alignment: .leading, spacing: 9) {
                     HStack(alignment: .top, spacing: 8) {
