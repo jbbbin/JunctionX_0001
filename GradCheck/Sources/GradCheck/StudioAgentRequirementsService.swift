@@ -23,7 +23,7 @@ enum StudioAgentCatalog {
             StudioAgentConfiguration(
                 purpose: .graduateRequirements,
                 agentID: "agt_9yuURkpPwpUh6UzJEp5dCA",
-                configID: "6",
+                configID: "8",
                 displayName: "미국 대학원 모집요강 Agent"
             )
         case .applicantIdentity:
@@ -381,6 +381,12 @@ struct StudioAgentRequirementsService: GraduateRequirementsAnalyzing {
             else {
                 return nil
             }
+            let submissionMethod = submissionMethod(for: item)
+            let relatedDocumentType = documentType(
+                for: item.category,
+                title: item.requirementName,
+                details: item.details
+            ) ?? (submissionMethod.requiresFileUpload ? .supportingDocument : nil)
             return RequirementItem(
                 title: item.requirementName,
                 detail: item.details.isEmpty ? "공식 모집요강에서 확인된 제출 요건" : item.details,
@@ -388,35 +394,86 @@ struct StudioAgentRequirementsService: GraduateRequirementsAnalyzing {
                 status: necessity == .conditional ? .humanReview : .ready,
                 sourceName: sourceName,
                 page: firstPage(in: item.sourcePage),
-                relatedDocumentType: documentType(for: item.category),
+                relatedDocumentType: relatedDocumentType,
                 necessity: necessity,
-                requiredCount: recommendationCount(in: "\(item.requirementName) \(item.details)", category: item.category)
+                requiredCount: recommendationCount(
+                    in: "\(item.requirementName) \(item.details)",
+                    documentType: relatedDocumentType
+                ),
+                submissionMethod: submissionMethod
             )
         }
     }
 
-    private func documentType(for category: String) -> DocumentType? {
+    private func documentType(for category: String, title: String, details: String) -> DocumentType? {
         switch normalizedAgentValue(category) {
-        case "recommendation", "recommendation_letter", "추천서", "추천인": .recommendation
-        case "statement", "personal_statement", "sop", "학업계획서", "자기소개서", "개인진술서", "에세이", "에세이질문": .sop
-        case "cv_resume", "cv", "resume", "이력서", "경력기술서": .cv
-        case "transcript", "academic_record", "성적표", "성적증명서", "학업성적표": .transcript
-        case "english_test", "english_score", "toefl_ielts", "영어성적", "영어시험", "토플", "아이엘츠": .englishScore
-        case "gre", "gmat", "gre_score", "gre성적", "gmat성적": .greScore
-        case "portfolio", "포트폴리오": .portfolio
-        case "writing_sample", "작문샘플", "글쓰기샘플": .writingSample
-        case "research_proposal", "research_plan", "연구계획서", "연구제안서": .researchProposal
-        case "degree_certificate", "diploma", "학위증명서", "졸업증명서": .degreeCertificate
-        case "passport_visa", "passport", "visa", "여권", "비자", "여권비자": .passportVisa
-        default: nil
+        case "recommendation", "recommendation_letter", "추천서", "추천인": return .recommendation
+        case "statement", "personal_statement", "sop", "학업계획서", "자기소개서", "개인진술서", "에세이", "에세이질문": return .sop
+        case "cv_resume", "cv", "resume", "이력서", "경력기술서": return .cv
+        case "transcript", "academic_record", "성적표", "성적증명서", "학업성적표": return .transcript
+        case "english_test", "english_score", "toefl_ielts", "영어성적", "영어시험", "토플", "아이엘츠": return .englishScore
+        case "gre", "gmat", "gre_score", "gre성적", "gmat성적": return .greScore
+        case "portfolio", "포트폴리오": return .portfolio
+        case "writing_sample", "작문샘플", "글쓰기샘플": return .writingSample
+        case "research_proposal", "research_plan", "연구계획서", "연구제안서": return .researchProposal
+        case "degree_certificate", "diploma", "학위증명서", "졸업증명서": return .degreeCertificate
+        case "passport_visa", "passport", "visa", "여권", "비자", "여권비자": return .passportVisa
+        case "financial_proof", "financial_document", "bank_statement", "sponsorship", "재정증명", "경비지변", "경비지변서": return .financialProof
+        case "application_form", "application_document", "entry_form", "입학원서", "지원서", "지정양식": return .applicationForm
+        case "photo", "identity_photo", "photograph", "사진", "증명사진": return .identityPhoto
+        case "residency_document", "residence_certificate", "certificate_of_eligibility", "체류자격", "재류자격": return .residencyDocument
+        case "translation", "certified_translation", "번역문", "공인번역": return .certifiedTranslation
+        default:
+            return documentTypeFromRequirementText("\(title) \(details)")
         }
+    }
+
+    private func documentTypeFromRequirementText(_ text: String) -> DocumentType? {
+        let value = normalizedAgentValue(text)
+        if containsAny(value, ["졸업증명", "학위증명", "degreecertificate", "diploma", "graduationcertificate"]) { return .degreeCertificate }
+        if containsAny(value, ["성적증명", "성적표", "transcript", "academicrecord"]) { return .transcript }
+        if containsAny(value, ["경비지변", "재정증명", "financialproof", "bankstatement", "sponsor"]) { return .financialProof }
+        if containsAny(value, ["입학원서", "지원서", "applicationform", "designatedform", "prescribedform"]) { return .applicationForm }
+        if containsAny(value, ["증명사진", "사진", "photo", "photograph"]) { return .identityPhoto }
+        if containsAny(value, ["재류자격", "체류자격", "residencecertificate", "certificateofeligibility"]) { return .residencyDocument }
+        if containsAny(value, ["번역문", "translation", "translateddocument"]) { return .certifiedTranslation }
+        if containsAny(value, ["passport", "visa", "여권", "비자"]) { return .passportVisa }
+        return nil
+    }
+
+    private func submissionMethod(for item: AgentRequirementsResult.Item) -> SubmissionMethod {
+        if let method = SubmissionMethod(agentValue: item.submissionMethod) {
+            return method
+        }
+
+        let title = normalizedAgentValue(item.requirementName)
+        let content = normalizedAgentValue("\(item.requirementName) \(item.details)")
+        if containsAny(title, ["수수료", "applicationfee", "마감일", "면접", "원본제출", "우편제출", "서류제출"]) {
+            return containsAny(title, ["원본제출", "우편제출", "서류제출"])
+                ? .physicalDelivery
+                : .portalAction
+        }
+        if documentType(for: item.category, title: item.requirementName, details: item.details) != nil {
+            return .uploadFile
+        }
+        if containsAny(content, ["증명서", "서류", "사진", "번역문", "양식", "certificate", "document", "photo", "translation", "form"]) {
+            return .uploadFile
+        }
+        if containsAny(content, ["original", "mail", "postal", "우편", "지참", "원본제출", "직접제출"]) {
+            return .physicalDelivery
+        }
+        return .portalAction
+    }
+
+    private func containsAny(_ value: String, _ terms: [String]) -> Bool {
+        terms.contains { value.contains(normalizedAgentValue($0)) }
     }
 
     private func necessity(for value: String) -> RequirementNecessity? {
         switch normalizedAgentValue(value) {
         case "not_stated", "notstated", "명시되지않음", "미기재", "미명시":
             nil
-        case "conditional", "조건부", "해당시", "필요시", "경우에따라":
+        case "conditional", "선택", "조건부", "해당시", "필요시", "경우에따라":
             .conditional
         default:
             // Both `required` and `usually_required` are presented as a
@@ -432,8 +489,8 @@ struct StudioAgentRequirementsService: GraduateRequirementsAnalyzing {
         return Int(value[match])
     }
 
-    private func recommendationCount(in text: String, category: String) -> Int? {
-        guard documentType(for: category) == .recommendation else { return nil }
+    private func recommendationCount(in text: String, documentType: DocumentType?) -> Int? {
+        guard documentType == .recommendation else { return nil }
         guard let match = text.range(
             of: #"\b([1-9]|10)\s*(?:letters?|recommendations?|references?|부|통)"#,
             options: [.regularExpression, .caseInsensitive]
@@ -459,6 +516,23 @@ private extension String? {
             true
         default:
             false
+        }
+    }
+}
+
+private extension SubmissionMethod {
+    init?(agentValue: String?) {
+        switch normalizedAgentValue(agentValue ?? "") {
+        case "upload_file", "upload", "file", "document", "파일업로드", "파일":
+            self = .uploadFile
+        case "portal_action", "portal", "online_action", "online", "direct_check", "온라인절차", "포털입력", "직접확인":
+            self = .portalAction
+        case "physical_delivery", "physical", "mail", "postal", "original_submission", "우편제출", "원본제출", "직접제출":
+            self = .physicalDelivery
+        case "informational", "information", "안내":
+            self = .informational
+        default:
+            return nil
         }
     }
 }
@@ -496,6 +570,7 @@ private struct AgentRequirementsResult: Decodable {
         let requirementName: String
         let category: String
         let requirementLevel: String
+        let submissionMethod: String?
         let details: String
         let sourcePage: String?
 
@@ -503,6 +578,7 @@ private struct AgentRequirementsResult: Decodable {
             case category, details
             case requirementName = "requirement_name"
             case requirementLevel = "requirement_level"
+            case submissionMethod = "submission_method"
             case sourcePage = "source_page"
         }
     }

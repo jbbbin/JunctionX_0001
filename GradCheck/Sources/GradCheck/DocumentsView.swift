@@ -109,32 +109,43 @@ struct DocumentsView: View {
                     .padding(.vertical, 16)
                 } else {
                     VStack(spacing: 0) {
-                        ForEach(Array(state.requiredDocumentTypes.enumerated()), id: \.element.id) { index, type in
-                            DocumentSlotRow(
-                                type: type,
-                                documents: state.documents.filter { $0.type == type },
-                                expectedCount: state.requiredCount(for: type),
-                                replace: {
-                                    importTarget = type
-                                    showImporter = true
-                                },
-                                remove: { state.removeDocument($0) },
-                                sampleRevision: type == .sop && state.workspace.isSample
-                                    ? { state.applyRevisedSampleSOP() }
-                                    : nil,
-                                dropped: { urls in
-                                    state.importDocuments(urls, as: type)
-                                }
-                            )
-                            if index < state.requiredDocumentTypes.count - 1 { Divider().padding(.leading, 74) }
-                        }
-                    }
+                        if !state.requiredDocumentTypes.isEmpty {
+                            ForEach(Array(state.requiredDocumentTypes.enumerated()), id: \.element.id) { index, type in
+                                DocumentSlotRow(
+                                    type: type,
+                                    documents: state.documents.filter { $0.type == type },
+                                    expectedCount: state.requiredCount(for: type),
+                                    necessity: uploadNecessity(for: type),
+                                    replace: {
+                                        importTarget = type
+                                        showImporter = true
+                                    },
+                                    remove: { state.removeDocument($0) },
+                                    sampleRevision: type == .sop && state.workspace.isSample
+                                        ? { state.applyRevisedSampleSOP() }
+                                        : nil,
+                                    dropped: { urls in
+                                        state.importDocuments(urls, as: type)
+                                    }
+                                )
+                                if index < state.requiredDocumentTypes.count - 1 { Divider().padding(.leading, 74) }
+                            }
 
-                    dropZone
-                        .padding(18)
+                            dropZone
+                                .padding(18)
+                        }
+
+                    }
                 }
             }
         }
+    }
+
+    private func uploadNecessity(for type: DocumentType) -> RequirementNecessity {
+        let matching = state.requirements.filter {
+            $0.documentTypeForUpload == type && $0.effectiveNecessity != .informational
+        }
+        return matching.contains(where: { $0.effectiveNecessity == .required }) ? .required : .conditional
     }
 
     private var requirementsSourceSummary: some View {
@@ -191,11 +202,12 @@ struct DocumentsView: View {
         }
     }
 
-    /// Requirements without an uploadable document type belong here instead of
-    /// being repeated in the file slots above.
+    /// Only offline delivery steps remain here. Online actions are grouped with
+    /// uploadable files above because both are completed in the application flow.
     private var directCheckItemsCard: some View {
         let values = state.requirements.filter {
-            $0.effectiveNecessity != .informational && $0.relatedDocumentType == nil
+            $0.effectiveNecessity != .informational
+                && $0.effectiveSubmissionMethod == .physicalDelivery
         }
         let accent = ReviewStatus.humanReview.color
         return SurfaceCard(padding: 0) {
@@ -203,9 +215,9 @@ struct DocumentsView: View {
                 HStack(spacing: 12) {
                     sectionNumber("2", color: accent)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("파일 없이 직접 확인할 항목")
+                        Text("직접 제출·확인할 항목")
                             .font(.system(size: 15, weight: .bold))
-                        Text("온라인 지원서·수수료·제출 방식처럼 파일을 올리지 않는 요건입니다.")
+                        Text("원본 우편 발송·현장 제출처럼 온라인 처리만으로 완료되지 않는 요건입니다.")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -223,7 +235,7 @@ struct DocumentsView: View {
                     HStack(spacing: 10) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(ReviewStatus.ready.color)
-                        Text("이 모집요강에는 파일 외에 따로 확인할 항목이 없습니다.")
+                        Text("이 모집요강에는 별도로 직접 제출할 항목이 없습니다.")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -232,35 +244,39 @@ struct DocumentsView: View {
                     .padding(.vertical, 16)
                 } else {
                     ForEach(Array(values.enumerated()), id: \.element.id) { index, requirement in
-                        HStack(alignment: .top, spacing: 11) {
-                            Image(systemName: requirement.effectiveNecessity == .conditional ? "exclamationmark.circle.fill" : "checkmark.square")
-                                .foregroundStyle(requirement.effectiveNecessity == .conditional ? accent : GCTheme.brand)
-                                .padding(.top, 1)
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 7) {
-                                    Text(requirement.title)
-                                        .font(.system(size: 12, weight: .semibold))
-                                    Text(requirement.effectiveNecessity.rawValue)
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundStyle(requirement.effectiveNecessity == .conditional ? accent : ReviewStatus.ready.color)
-                                }
-                                Text(requirement.detail)
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                Text(requirement.page.map { "\(requirement.sourceName) · p.\($0)" } ?? requirement.sourceName)
-                                    .font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(GCTheme.secondaryInk)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 13)
+                        requirementProcedureRow(requirement, accent: accent)
                         if index < values.count - 1 { Divider().padding(.leading, 48) }
                     }
                 }
             }
         }
+    }
+
+    private func requirementProcedureRow(_ requirement: RequirementItem, accent: Color) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            Image(systemName: requirement.effectiveNecessity == .conditional ? "exclamationmark.circle.fill" : "checkmark.square")
+                .foregroundStyle(requirement.effectiveNecessity == .conditional ? accent : GCTheme.brand)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 7) {
+                    Text(requirement.title)
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(requirement.effectiveNecessity.rawValue)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(requirement.effectiveNecessity == .conditional ? accent : ReviewStatus.ready.color)
+                }
+                Text(requirement.detail)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(requirement.page.map { "\(requirement.sourceName) · p.\($0)" } ?? requirement.sourceName)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(GCTheme.secondaryInk)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 13)
     }
 
     private func sectionNumber(_ value: String, color: Color) -> some View {
@@ -279,7 +295,7 @@ struct DocumentsView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(isDropTargeted ? .white : GCTheme.brand)
             VStack(alignment: .leading, spacing: 2) {
-                Text("여기에 여러 파일을 놓아도 돼요")
+                Text("여러 파일을 놓아도 돼요")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(isDropTargeted ? .white : GCTheme.ink)
                 Text("파일명과 내용을 기준으로 문서 유형을 분류합니다.")
@@ -305,9 +321,6 @@ struct DocumentsView: View {
 
     private var processingNote: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: state.isUpstageConnected ? "network.badge.shield.half.filled" : "lock.macwindow")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(GCTheme.brand)
             VStack(alignment: .leading, spacing: 4) {
                 Text(state.providerLabel)
                     .font(.system(size: 12, weight: .semibold))
@@ -329,6 +342,7 @@ private struct DocumentSlotRow: View {
     let type: DocumentType
     let documents: [DocumentItem]
     let expectedCount: Int
+    let necessity: RequirementNecessity
     let replace: () -> Void
     let remove: (DocumentItem) -> Void
     let sampleRevision: (() -> Void)?
@@ -350,9 +364,14 @@ private struct DocumentSlotRow: View {
             .frame(width: 44, height: 44)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(type.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(GCTheme.ink)
+                HStack(spacing: 7) {
+                    Text(type.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(GCTheme.ink)
+                    Text(necessity == .conditional ? "선택" : "필수")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(necessity == .conditional ? ReviewStatus.humanReview.color : ReviewStatus.ready.color)
+                }
                 if let document {
                     HStack(spacing: 7) {
                         Text(documents.prefix(2).map(\.filename).joined(separator: ", "))

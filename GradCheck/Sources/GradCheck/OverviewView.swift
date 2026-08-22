@@ -213,13 +213,13 @@ struct OverviewView: View {
 
                 if priorityFindings.isEmpty {
                     EmptyStateView(
-                        symbol: auditedWorkspaceCount == 0 ? "sparkles" : "checkmark.seal.fill",
+                        symbol: auditedWorkspaceCount == 0 ? "document.badge.plus" : "checkmark.seal.fill",
                         title: auditedWorkspaceCount == 0 ? "아직 검수된 지원서가 없어요" : "우선 확인할 문제가 없어요",
                         message: auditedWorkspaceCount == 0
                             ? "검수할 지원 항목을 선택하면 전체 우선순위가 여기에 모입니다."
                             : "현재 전체 검수 결과에서 수정이 필요한 항목이 없습니다.",
-                        actionTitle: auditedWorkspaceCount == 0 ? "선택한 지원서 검수" : nil,
-                        action: auditedWorkspaceCount == 0 ? { state.showSelectedWorkspaceAudit() } : nil
+                        actionTitle: auditedWorkspaceCount == 0 ? "새 지원 목표 만들기" : nil,
+                        action: auditedWorkspaceCount == 0 ? { state.showNewWorkspace = true } : nil
                     )
                 } else {
                     ForEach(Array(priorityFindings.enumerated()), id: \.element.id) { index, item in

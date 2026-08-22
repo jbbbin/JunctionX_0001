@@ -159,7 +159,7 @@ enum DemoData {
             status: .ready,
             category: .completeness,
             title: "기본 대조 서류 4종이 준비됐어요",
-            summary: "CV, SOP, 성적표, 공인영어성적 파일을 확인했습니다. 조건부 제출 항목은 별도로 확인해야 합니다.",
+            summary: "CV, SOP, 성적표, 공인영어성적 파일을 확인했습니다. 선택 제출 항목은 별도로 확인해야 합니다.",
             action: "각 문서의 세부 검수 결과를 이어서 확인하세요.",
             evidences: [
                 EvidenceRef(
@@ -373,7 +373,10 @@ enum DemoData {
                     "Application deadline and final notes."
                 ]
             case .recommendation, .greScore, .writingSample, .portfolio,
-                 .researchProposal, .degreeCertificate, .passportVisa, .other:
+                 .researchProposal, .degreeCertificate, .passportVisa,
+                 .financialProof, .applicationForm, .identityPhoto,
+                 .residencyDocument, .certifiedTranslation, .supportingDocument,
+                 .other:
                 pages = []
             }
             if !pages.isEmpty {

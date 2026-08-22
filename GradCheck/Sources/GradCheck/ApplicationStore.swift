@@ -30,8 +30,8 @@ struct RequirementAnalysisResult {
     static func requiredTypes(from requirements: [RequirementItem]) -> [DocumentType] {
         var seen = Set<DocumentType>()
         return requirements
-            .filter { $0.effectiveNecessity != .informational }
-            .compactMap(\.relatedDocumentType)
+            .filter(\.requiresFileUpload)
+            .compactMap(\.documentTypeForUpload)
             .sorted { $0.sortOrder < $1.sortOrder }
             .filter { seen.insert($0).inserted }
     }
@@ -39,7 +39,7 @@ struct RequirementAnalysisResult {
     static func requiredCount(for type: DocumentType, in requirements: [RequirementItem]) -> Int {
         requirements
             .filter {
-                $0.relatedDocumentType == type && $0.effectiveNecessity != .informational
+                $0.documentTypeForUpload == type && $0.effectiveNecessity != .informational
             }
             .map { max($0.requiredCount ?? 1, 1) }
             .max() ?? 0

@@ -11,7 +11,7 @@ struct ApplicantProfile: Sendable, Equatable {
     static let current = ApplicantProfile(
         displayName: "김민준",
         legalName: "MINJUN KIM",
-        email: "minjan.kim@example.com"
+        email: "minjoon.kim@example.com"
     )
 }
 

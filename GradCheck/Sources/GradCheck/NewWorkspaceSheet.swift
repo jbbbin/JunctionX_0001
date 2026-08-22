@@ -112,7 +112,7 @@ struct NewWorkspaceSheet: View {
         Form {
             Section("지원 대상") {
                 TextField("학교명", text: $model.school, prompt: Text("OOO University"))
-                TextField("프로그램명", text: $model.program, prompt: Text("Computer Science"))
+                TextField("전공", text: $model.program, prompt: Text("Computer Science"))
                 Picker("학위 과정", selection: $model.degree) {
                     ForEach(["PhD", "MS", "MA", "MEng", "MBA"], id: \.self) { Text($0).tag($0) }
                 }
@@ -245,7 +245,7 @@ struct NewWorkspaceSheet: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("모집요강 분석 완료")
                                 .font(.system(size: 16, weight: .bold))
-                            Text("아래 서류 구성을 새 지원서에 적용합니다. 조건부 항목은 이후 검수에서 직접 확인으로 남습니다.")
+                            Text("아래 서류 구성을 새 지원서에 적용합니다. 선택 항목은 이후 검수에서 직접 확인으로 남습니다.")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }
@@ -263,7 +263,7 @@ struct NewWorkspaceSheet: View {
                         VStack(spacing: 0) {
                             ForEach(Array(analysis.requiredDocumentTypes.enumerated()), id: \.element) { index, type in
                                 let related = analysis.requirements.filter {
-                                    $0.relatedDocumentType == type && $0.effectiveNecessity != .informational
+                                    $0.documentTypeForUpload == type && $0.effectiveNecessity != .informational
                                 }
                                 HStack(alignment: .top, spacing: 13) {
                                     Image(systemName: type.symbol)
@@ -295,7 +295,7 @@ struct NewWorkspaceSheet: View {
                                     }
                                     Spacer()
                                     let needsReview = related.contains { $0.effectiveNecessity == .conditional }
-                                    Text(needsReview ? "조건부" : "필수")
+                                    Text(needsReview ? "선택" : "필수")
                                         .font(.system(size: 9, weight: .bold))
                                         .foregroundStyle(needsReview ? ReviewStatus.humanReview.color : ReviewStatus.ready.color)
                                 }

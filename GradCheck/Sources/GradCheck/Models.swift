@@ -93,6 +93,12 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
     case researchProposal
     case degreeCertificate
     case passportVisa
+    case financialProof
+    case applicationForm
+    case identityPhoto
+    case residencyDocument
+    case certifiedTranslation
+    case supportingDocument
     case requirements
     case other
 
@@ -111,6 +117,12 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         case .researchProposal: "연구계획서"
         case .degreeCertificate: "학위·졸업증명서"
         case .passportVisa: "여권·비자 서류"
+        case .financialProof: "재정·경비 증빙서류"
+        case .applicationForm: "입학원서·지정 양식"
+        case .identityPhoto: "증명사진"
+        case .residencyDocument: "체류자격 증명서류"
+        case .certifiedTranslation: "공인 번역문"
+        case .supportingDocument: "기타 증빙 서류"
         case .requirements: "공식 모집요강"
         case .other: "기타 문서"
         }
@@ -129,6 +141,12 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         case .researchProposal: "연구계획"
         case .degreeCertificate: "학위증명"
         case .passportVisa: "여권/비자"
+        case .financialProof: "재정증빙"
+        case .applicationForm: "입학원서"
+        case .identityPhoto: "사진"
+        case .residencyDocument: "체류증명"
+        case .certifiedTranslation: "번역문"
+        case .supportingDocument: "기타증빙"
         case .requirements: "모집요강"
         case .other: "기타"
         }
@@ -147,6 +165,12 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         case .researchProposal: "lightbulb.max"
         case .degreeCertificate: "checkmark.seal"
         case .passportVisa: "person.text.rectangle"
+        case .financialProof: "banknote"
+        case .applicationForm: "doc.badge.plus"
+        case .identityPhoto: "person.crop.square"
+        case .residencyDocument: "person.text.rectangle.fill"
+        case .certifiedTranslation: "character.book.closed"
+        case .supportingDocument: "doc.badge.gearshape"
         case .requirements: "building.columns"
         case .other: "doc"
         }
@@ -173,8 +197,14 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         case .researchProposal: 8
         case .portfolio: 9
         case .passportVisa: 10
-        case .requirements: 11
-        case .other: 12
+        case .financialProof: 11
+        case .applicationForm: 12
+        case .identityPhoto: 13
+        case .residencyDocument: 14
+        case .certifiedTranslation: 15
+        case .supportingDocument: 16
+        case .requirements: 17
+        case .other: 18
         }
     }
 
@@ -192,6 +222,11 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         if value.contains("research") && (value.contains("proposal") || value.contains("plan")) { return .researchProposal }
         if value.contains("degree") || value.contains("diploma") || value.contains("graduation") { return .degreeCertificate }
         if value.contains("passport") || value.contains("visa") { return .passportVisa }
+        if value.contains("financial") || value.contains("bank") || value.contains("sponsor") { return .financialProof }
+        if value.contains("application_form") || value.contains("application form") { return .applicationForm }
+        if value.contains("photo") || value.contains("photograph") { return .identityPhoto }
+        if value.contains("residence") || value.contains("eligibility") { return .residencyDocument }
+        if value.contains("translation") { return .certifiedTranslation }
         return .other
     }
 
@@ -401,8 +436,20 @@ enum RequirementScope: String, Codable {
 
 enum RequirementNecessity: String, Codable, CaseIterable {
     case required = "필수"
-    case conditional = "조건부"
+    case conditional = "선택"
     case informational = "안내"
+}
+
+/// How the applicant is expected to complete one official requirement.
+/// This is intentionally independent from `category`, which only describes
+/// what the item is (for example transcript or financial proof).
+enum SubmissionMethod: String, Codable, CaseIterable {
+    case uploadFile = "upload_file"
+    case portalAction = "portal_action"
+    case physicalDelivery = "physical_delivery"
+    case informational
+
+    var requiresFileUpload: Bool { self == .uploadFile }
 }
 
 struct RequirementItem: Identifiable, Codable, Hashable {
@@ -419,6 +466,7 @@ struct RequirementItem: Identifiable, Codable, Hashable {
     var requiredFileExtension: String?
     var necessity: RequirementNecessity?
     var requiredCount: Int?
+    var submissionMethod: SubmissionMethod?
 
     init(
         id: UUID = UUID(),
@@ -433,7 +481,8 @@ struct RequirementItem: Identifiable, Codable, Hashable {
         maximumWords: Int? = nil,
         requiredFileExtension: String? = nil,
         necessity: RequirementNecessity = .required,
-        requiredCount: Int? = nil
+        requiredCount: Int? = nil,
+        submissionMethod: SubmissionMethod? = nil
     ) {
         self.id = id
         self.title = title
@@ -448,10 +497,41 @@ struct RequirementItem: Identifiable, Codable, Hashable {
         self.requiredFileExtension = requiredFileExtension
         self.necessity = necessity
         self.requiredCount = requiredCount
+        self.submissionMethod = submissionMethod
     }
 
     var effectiveNecessity: RequirementNecessity {
         necessity ?? (status == .humanReview ? .conditional : .required)
+    }
+
+    /// Old saved workspaces do not yet contain `submissionMethod`. Keep them
+    /// usable by falling back to the former document-type mapping.
+    var effectiveSubmissionMethod: SubmissionMethod {
+        if let submissionMethod { return submissionMethod }
+        if effectiveNecessity == .informational { return .informational }
+        if relatedDocumentType != nil { return .uploadFile }
+
+        let title = title.lowercased()
+        if ["application fee", "수수료", "마감일", "면접", "원본 제출", "우편 제출", "서류 제출"].contains(where: title.contains) {
+            return title.contains("원본 제출") || title.contains("우편 제출") || title.contains("서류 제출")
+                ? .physicalDelivery
+                : .portalAction
+        }
+        if ["certificate", "document", "photo", "translation", "form", "transcript", "증명서", "서류", "사진", "번역", "원서", "양식", "성적", "납입표", "수험표", "체크표"].contains(where: title.contains) {
+            return .uploadFile
+        }
+        return .portalAction
+    }
+
+    var requiresFileUpload: Bool {
+        effectiveNecessity != .informational && effectiveSubmissionMethod.requiresFileUpload
+    }
+
+    /// The Studio Agent may know that a requirement is uploadable while its
+    /// category is new to this app. Keep it in the upload section rather than
+    /// incorrectly sending it to a manual-only checklist.
+    var documentTypeForUpload: DocumentType? {
+        relatedDocumentType ?? (requiresFileUpload ? .supportingDocument : nil)
     }
 }
 

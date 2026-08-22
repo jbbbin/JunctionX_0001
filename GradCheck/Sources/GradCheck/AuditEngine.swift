@@ -50,7 +50,7 @@ struct AuditEngine {
                 $0.type == type && $0.processingStatus == .ready
             }
             let requirement = requirements.first {
-                $0.relatedDocumentType == type && $0.effectiveNecessity != .informational
+                $0.documentTypeForUpload == type && $0.effectiveNecessity != .informational
             }
             let requirementEvidence = requirement.map {
                 EvidenceRef(
@@ -103,7 +103,7 @@ struct AuditEngine {
                     ? "\(type.title) \(expectedCount)부가 필요해요"
                     : "\(type.title) 파일이 필요해요",
                 summary: isConditional
-                    ? "조건부 제출 또는 면제 여부를 먼저 확인해야 합니다. 현재 \(readyDocuments.count)/\(expectedCount)부가 준비되었습니다."
+                    ? "선택 제출 또는 면제 여부를 먼저 확인해야 합니다. 현재 \(readyDocuments.count)/\(expectedCount)부가 준비되었습니다."
                     : "공식 모집요강 기준 \(expectedCount)부 중 \(readyDocuments.count)부만 분석할 수 있습니다.",
                 action: isConditional
                     ? "공식 조건을 직접 확인하고 해당되면 파일을 추가하세요."
@@ -699,7 +699,7 @@ struct AuditEngine {
                 fieldLabel: "공식 요건"
             )
 
-            guard let type = requirement.relatedDocumentType else {
+            guard let type = requirement.documentTypeForUpload else {
                 if let keywords = supplementaryKeywords(for: requirement.title) {
                     let supplied = documents.contains { document in
                         guard document.processingStatus == .ready, document.type != .requirements else { return false }
@@ -718,7 +718,7 @@ struct AuditEngine {
                                 title: !supplied ? "\(requirement.title) 제출 여부를 확인해 주세요" : "\(requirement.title) 조건을 직접 확인해 주세요",
                                 summary: !supplied
                                     ? "공식 모집요강에는 해당 항목이 있지만 대응하는 업로드 문서를 확인하지 못했습니다."
-                                    : "대응 문서는 찾았지만 조건부·면제 여부를 자동으로 확정하지 않았습니다.",
+                                    : "대응 문서는 찾았지만 선택·면제 여부를 자동으로 확정하지 않았습니다.",
                                 action: "공식 모집요강과 지원 시스템에서 필수 여부와 제출 상태를 직접 확인하세요.",
                                 evidences: [requirementEvidence]
                             )

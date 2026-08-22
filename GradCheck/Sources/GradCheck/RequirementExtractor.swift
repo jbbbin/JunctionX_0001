@@ -70,7 +70,7 @@ struct RequirementExtractor {
         return [
             RequirementItem(
                 title: "공식 요건 직접 확인",
-                detail: "문서 텍스트는 읽었지만 필수·조건부 요건을 확실하게 구조화하지 못했습니다.",
+                detail: "문서 텍스트는 읽었지만 필수·선택 요건을 확실하게 구조화하지 못했습니다.",
                 scope: .program,
                 status: .humanReview,
                 sourceName: sourceName,
