@@ -116,6 +116,36 @@ final class AppViewModel: ObservableObject {
         objectWillChange.send()
     }
 
+    func deleteWorkspace(_ id: UUID) {
+        guard portfolio.sessions.count > 1 else {
+            errorMessage = "지원 항목은 하나 이상 남겨야 합니다."
+            return
+        }
+        guard let index = portfolio.sessions.firstIndex(where: { $0.id == id }) else { return }
+
+        let deletingSelectedWorkspace = id == selectedWorkspaceID
+        if deletingSelectedWorkspace {
+            cancelActiveImport()
+            cancelActiveAudit()
+        }
+
+        var updated = portfolio
+        let deletedWorkspace = updated.sessions.remove(at: index).workspace
+        if deletingSelectedWorkspace {
+            let nextIndex = min(index, updated.sessions.count - 1)
+            updated.selectedWorkspaceID = updated.sessions[nextIndex].id
+        }
+        portfolio = updated
+
+        if deletingSelectedWorkspace {
+            selectedFindingID = findings.first(where: { $0.status == .blocked })?.id ?? findings.first?.id
+            destination = .overview
+        }
+        successMessage = "\(deletedWorkspace.school) 지원 항목을 삭제했어요."
+        persist()
+        dismissSuccessMessageLater()
+    }
+
     func analyzeRequirements(_ urls: [URL]) async throws -> RequirementAnalysisResult {
         guard !urls.isEmpty else { throw WorkspaceFlowError.requirementsMissing }
 

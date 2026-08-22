@@ -265,6 +265,40 @@ final class AppViewModelTests: XCTestCase {
         XCTAssertEqual(session.readyDocumentCount, 2)
     }
 
+    func testDeletingSelectedWorkspaceSelectsRemainingWorkspace() {
+        let state = AppViewModel(loadSavedState: false, environment: [:])
+        let sampleID = state.selectedWorkspaceID
+        state.addWorkspace(
+            draft: WorkspaceDraft(
+                school: "Stanford University",
+                program: "Computer Science",
+                degree: "MS",
+                intake: "Fall 2028",
+                applicantName: ""
+            ),
+            analysis: requirementAnalysis(type: .sop, source: "stanford.txt")
+        )
+        let deletingID = state.selectedWorkspaceID
+
+        state.deleteWorkspace(deletingID)
+
+        XCTAssertEqual(state.workspaces.count, 1)
+        XCTAssertEqual(state.selectedWorkspaceID, sampleID)
+        XCTAssertEqual(state.destination, .overview)
+        XCTAssertFalse(state.workspaces.contains { $0.id == deletingID })
+    }
+
+    func testDeletingLastWorkspaceIsRejected() {
+        let state = AppViewModel(loadSavedState: false, environment: [:])
+        let lastID = state.selectedWorkspaceID
+
+        state.deleteWorkspace(lastID)
+
+        XCTAssertEqual(state.workspaces.count, 1)
+        XCTAssertEqual(state.selectedWorkspaceID, lastID)
+        XCTAssertNotNil(state.errorMessage)
+    }
+
     func testWorkspaceCreationRejectsMissingRequirementAnalysis() {
         let state = AppViewModel(loadSavedState: false, environment: [:])
         state.addWorkspace(
