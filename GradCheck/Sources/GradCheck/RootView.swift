@@ -9,7 +9,7 @@ struct RootView: View {
                 .navigationSplitViewColumnWidth(min: 220, ideal: 252, max: 285)
         } detail: {
             VStack(spacing: 0) {
-                if state.destination != .documents || state.documentsRoute == .detail {
+                if showsWorkspaceHeader {
                     WorkspaceHeader()
                     Divider().opacity(0.55)
                 }
@@ -53,6 +53,14 @@ struct RootView: View {
             Button("확인", role: .cancel) { state.errorMessage = nil }
         } message: {
             Text(state.errorMessage ?? "알 수 없는 오류가 발생했습니다.")
+        }
+    }
+
+    private var showsWorkspaceHeader: Bool {
+        switch state.destination {
+        case .documents: state.documentsRoute == .detail
+        case .audit: state.auditRoute == .detail
+        case .overview, .requirements: true
         }
     }
 

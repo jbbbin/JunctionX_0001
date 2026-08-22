@@ -13,7 +13,7 @@ struct SidebarView: View {
             VStack(spacing: 4) {
                 navigationButton(.overview)
                 supportDocumentsButton
-                navigationButton(.audit)
+                auditButton
             }
             .padding(.horizontal, 10)
 
@@ -49,6 +49,19 @@ struct SidebarView: View {
             state.destination = destination
         } label: {
             navigationLabel(for: destination, isSelected: isSelected)
+                .gcSidebarTab(selected: isSelected)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var auditButton: some View {
+        let isSelected = state.destination == .audit
+
+        return Button {
+            state.showAuditList()
+        } label: {
+            navigationLabel(for: .audit, isSelected: isSelected)
                 .gcSidebarTab(selected: isSelected)
         }
         .buttonStyle(.plain)

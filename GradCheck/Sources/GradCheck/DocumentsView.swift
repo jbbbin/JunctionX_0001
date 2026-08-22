@@ -6,7 +6,6 @@ struct DocumentsView: View {
     @State private var showImporter = false
     @State private var importTarget: DocumentType?
     @State private var isDropTargeted = false
-    @State private var pendingDeletion: ApplicationWorkspace?
 
     private let supportedTypes: [UTType] = [.pdf, .plainText, .rtf, .image]
 
@@ -29,128 +28,18 @@ struct DocumentsView: View {
             case .failure(let error): state.errorMessage = error.localizedDescription
             }
         }
-        .alert(
-            "지원 항목을 삭제할까요?",
-            isPresented: Binding(
-                get: { pendingDeletion != nil },
-                set: { if !$0 { pendingDeletion = nil } }
-            ),
-            presenting: pendingDeletion
-        ) { workspace in
-            Button("취소", role: .cancel) { pendingDeletion = nil }
-            Button("삭제", role: .destructive) {
-                state.deleteWorkspace(workspace.id)
-                pendingDeletion = nil
-            }
-        } message: { workspace in
-            Text("\(workspace.school) · \(workspace.program)의 모집요강, 서류 목록과 검수 이력이 이 Mac에서 삭제됩니다.")
-        }
     }
 
     private var workspaceList: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                HStack(alignment: .bottom) {
-                    SectionTitle(
-                        "지원 서류",
-                        eyebrow: "APPLICATIONS",
-                        subtitle: "지원할 학교와 프로그램을 선택해 모집요강 기반 서류 목록을 확인하세요."
-                    )
-                    Spacer()
-                    Button {
-                        state.showNewWorkspace = true
-                    } label: {
-                        Label("새 지원 목표", systemImage: "plus")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(GCTheme.brand)
-                }
-
-                LazyVStack(spacing: 12) {
-                    ForEach(state.workspaces) { workspace in
-                        workspaceListRow(workspace)
-                    }
-                }
-            }
-            .frame(maxWidth: 920)
-            .frame(maxWidth: .infinity)
-            .gcPagePadding()
-        }
-    }
-
-    private func workspaceListRow(_ workspace: ApplicationWorkspace) -> some View {
-        let isCurrent = workspace.id == state.selectedWorkspaceID
-
-        return SurfaceCard(padding: 0) {
-            HStack(spacing: 0) {
-                Button {
-                    state.showWorkspaceDocuments(workspace.id)
-                } label: {
-                    HStack(spacing: 16) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(isCurrent ? GCTheme.brandSoft : GCTheme.secondaryInk.opacity(0.07))
-                            Text(workspace.school.prefix(1))
-                                .font(.system(size: 20, weight: .bold, design: .rounded))
-                                .foregroundStyle(isCurrent ? GCTheme.brand : GCTheme.secondaryInk)
-                        }
-                        .frame(width: 48, height: 48)
-
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 8) {
-                                Text(workspace.school)
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundStyle(GCTheme.ink)
-                                if workspace.isSample {
-                                    Text("SAMPLE")
-                                        .font(.system(size: 8, weight: .bold, design: .rounded))
-                                        .foregroundStyle(GCTheme.blue)
-                                        .padding(.horizontal, 7)
-                                        .padding(.vertical, 3)
-                                        .background(GCTheme.blue.opacity(0.09))
-                                        .clipShape(Capsule())
-                                }
-                            }
-                            Text("\(workspace.program) · \(workspace.degree) · \(workspace.intake)")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-
-                        Spacer(minLength: 18)
-                        WorkspaceBadge(status: workspace.status)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.leading, 18)
-                    .padding(.vertical, 16)
-                    .padding(.trailing, 14)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                Divider()
-                    .frame(height: 44)
-
-                Menu {
-                    Button(role: .destructive) {
-                        pendingDeletion = workspace
-                    } label: {
-                        Label("지원 항목 삭제", systemImage: "trash")
-                    }
-                    .disabled(state.workspaces.count <= 1)
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(width: 42, height: 42)
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .padding(.horizontal, 8)
-                .help(state.workspaces.count <= 1 ? "마지막 지원 항목은 삭제할 수 없습니다." : "지원 항목 관리")
-            }
-        }
+        WorkspaceSelectionView(
+            title: "지원 서류",
+            eyebrow: "APPLICATIONS",
+            subtitle: "지원할 학교와 프로그램을 선택해 모집요강 기반 서류 목록을 확인하세요.",
+            actionTitle: "새 지원 목표",
+            action: { state.showNewWorkspace = true },
+            select: state.showWorkspaceDocuments
+        )
+        .environmentObject(state)
     }
 
     private var documentDetail: some View {

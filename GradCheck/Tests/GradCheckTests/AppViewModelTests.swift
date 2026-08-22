@@ -306,6 +306,25 @@ final class AppViewModelTests: XCTestCase {
         XCTAssertEqual(state.documentsRoute, .list)
     }
 
+    func testAuditNavigationShowsWorkspaceListBeforeReportDetail() {
+        let state = AppViewModel(loadSavedState: false, environment: [:])
+        let workspaceID = state.selectedWorkspaceID
+
+        state.showAuditList()
+
+        XCTAssertEqual(state.destination, .audit)
+        XCTAssertEqual(state.auditRoute, .list)
+
+        state.showWorkspaceAudit(workspaceID)
+
+        XCTAssertEqual(state.destination, .audit)
+        XCTAssertEqual(state.auditRoute, .detail)
+
+        state.showAuditList()
+
+        XCTAssertEqual(state.auditRoute, .list)
+    }
+
     func testDeletingLastWorkspaceIsRejected() {
         let state = AppViewModel(loadSavedState: false, environment: [:])
         let lastID = state.selectedWorkspaceID

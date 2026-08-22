@@ -5,6 +5,7 @@ import SwiftUI
 final class AppViewModel: ObservableObject {
     @Published var destination: AppDestination = .documents
     @Published private(set) var documentsRoute: DocumentsRoute = .list
+    @Published private(set) var auditRoute: AuditRoute = .list
     @Published private(set) var portfolio: ApplicationPortfolio
     @Published var selectedFindingID: UUID?
     @Published var isAuditing = false
@@ -122,6 +123,22 @@ final class AppViewModel: ObservableObject {
         documentsRoute = .detail
     }
 
+    func showAuditList() {
+        destination = .audit
+        auditRoute = .list
+    }
+
+    func showWorkspaceAudit(_ id: UUID) {
+        selectWorkspace(id)
+        destination = .audit
+        auditRoute = .detail
+    }
+
+    func showSelectedWorkspaceAudit() {
+        destination = .audit
+        auditRoute = .detail
+    }
+
     func saveUpstageAPIKey(_ value: String) throws {
         try apiKeyStore.saveAPIKey(value)
         objectWillChange.send()
@@ -155,7 +172,11 @@ final class AppViewModel: ObservableObject {
 
         if deletingSelectedWorkspace {
             selectedFindingID = findings.first(where: { $0.status == .blocked })?.id ?? findings.first?.id
-            showWorkspaceList()
+            if destination == .audit {
+                showAuditList()
+            } else {
+                showWorkspaceList()
+            }
         }
         successMessage = "\(deletedWorkspace.school) 지원 항목을 삭제했어요."
         persist()
@@ -456,7 +477,7 @@ final class AppViewModel: ObservableObject {
             self.selectedFindingID = auditedFindings.first(where: { $0.status == .blocked })?.id
                 ?? auditedFindings.first(where: { $0.status == .humanReview })?.id
                 ?? auditedFindings.first?.id
-            self.destination = .audit
+            self.showSelectedWorkspaceAudit()
             self.persist()
 
             if self.blockedCount == 0, self.humanReviewCount == 0 {

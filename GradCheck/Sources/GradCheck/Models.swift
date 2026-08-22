@@ -24,6 +24,11 @@ enum DocumentsRoute: Equatable {
     case detail
 }
 
+enum AuditRoute: Equatable {
+    case list
+    case detail
+}
+
 enum ReviewStatus: String, Codable, CaseIterable, Identifiable {
     case blocked = "BLOCKED"
     case humanReview = "HUMAN REVIEW"
