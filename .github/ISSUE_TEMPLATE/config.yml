@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 작업 전 확인
+    url: https://github.com/jbbbin/JunctionX_0001/issues
+    about: 중복 이슈와 다른 Codex가 수정 중인 파일이 있는지 먼저 확인해주세요.
