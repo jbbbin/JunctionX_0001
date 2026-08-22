@@ -3,9 +3,7 @@ import SwiftUI
 
 @MainActor
 final class AppViewModel: ObservableObject {
-    @Published var destination: AppDestination = .documents
-    @Published private(set) var documentsRoute: DocumentsRoute = .list
-    @Published private(set) var auditRoute: AuditRoute = .list
+    @Published var destination: AppDestination = .overview
     @Published private(set) var portfolio: ApplicationPortfolio
     @Published var selectedFindingID: UUID?
     @Published var isAuditing = false
@@ -142,36 +140,29 @@ final class AppViewModel: ObservableObject {
         persist()
     }
 
-    func showWorkspaceList() {
-        destination = .documents
-        documentsRoute = .list
-    }
-
     func showWorkspaceDocuments(_ id: UUID) {
         selectWorkspace(id)
         destination = .documents
-        documentsRoute = .detail
     }
 
     func showSelectedWorkspaceDocuments() {
         destination = .documents
-        documentsRoute = .detail
-    }
-
-    func showAuditList() {
-        destination = .audit
-        auditRoute = .list
     }
 
     func showWorkspaceAudit(_ id: UUID) {
         selectWorkspace(id)
         destination = .audit
-        auditRoute = .detail
     }
 
     func showSelectedWorkspaceAudit() {
         destination = .audit
-        auditRoute = .detail
+    }
+
+    func selectWorkspaceFromSidebar(_ id: UUID) {
+        selectWorkspace(id)
+        if destination == .requirements {
+            destination = .documents
+        }
     }
 
     func showWorkspaceRequirements(_ id: UUID) {
@@ -183,7 +174,6 @@ final class AppViewModel: ObservableObject {
         selectWorkspace(item.workspaceID)
         selectedFindingID = item.finding.id
         destination = .audit
-        auditRoute = .detail
     }
 
     func saveUpstageAPIKey(_ value: String) throws {
@@ -219,11 +209,7 @@ final class AppViewModel: ObservableObject {
 
         if deletingSelectedWorkspace {
             selectedFindingID = findings.first(where: { $0.status == .blocked })?.id ?? findings.first?.id
-            if destination == .audit {
-                showAuditList()
-            } else {
-                showWorkspaceList()
-            }
+            if destination == .requirements { destination = .documents }
         }
         successMessage = "\(deletedWorkspace.school) 지원 항목을 삭제했어요."
         persist()

@@ -57,12 +57,7 @@ struct RootView: View {
     }
 
     private var showsWorkspaceHeader: Bool {
-        switch state.destination {
-        case .documents: state.documentsRoute == .detail
-        case .audit: state.auditRoute == .detail
-        case .overview: false
-        case .requirements: true
-        }
+        state.destination != .overview
     }
 
     @ViewBuilder

@@ -10,14 +10,7 @@ struct DocumentsView: View {
     private let supportedTypes: [UTType] = [.pdf, .plainText, .rtf, .image]
 
     var body: some View {
-        Group {
-            switch state.documentsRoute {
-            case .list:
-                workspaceList
-            case .detail:
-                documentDetail
-            }
-        }
+        documentDetail
         .fileImporter(
             isPresented: $showImporter,
             allowedContentTypes: supportedTypes,
@@ -30,30 +23,9 @@ struct DocumentsView: View {
         }
     }
 
-    private var workspaceList: some View {
-        WorkspaceSelectionView(
-            title: "지원 서류",
-            eyebrow: "APPLICATIONS",
-            subtitle: "지원할 학교와 프로그램을 선택해 모집요강 기반 서류 목록을 확인하세요.",
-            actionTitle: "새 지원 목표",
-            action: { state.showNewWorkspace = true },
-            select: state.showWorkspaceDocuments
-        )
-        .environmentObject(state)
-    }
-
     private var documentDetail: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                Button {
-                    state.showWorkspaceList()
-                } label: {
-                    Label("지원 목록", systemImage: "chevron.left")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(GCTheme.brand)
-
                 HStack(alignment: .bottom) {
                     SectionTitle(
                         "지원 서류",

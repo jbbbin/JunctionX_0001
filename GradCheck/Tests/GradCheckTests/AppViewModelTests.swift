@@ -285,44 +285,55 @@ final class AppViewModelTests: XCTestCase {
         XCTAssertEqual(state.workspaces.count, 1)
         XCTAssertEqual(state.selectedWorkspaceID, sampleID)
         XCTAssertEqual(state.destination, .documents)
-        XCTAssertEqual(state.documentsRoute, .list)
         XCTAssertFalse(state.workspaces.contains { $0.id == deletingID })
     }
 
-    func testDocumentNavigationStartsAtListAndOpensSelectedWorkspaceDetail() {
+    func testDocumentNavigationOpensSelectedWorkspaceDirectly() {
         let state = AppViewModel(loadSavedState: false, environment: [:])
         let workspaceID = state.selectedWorkspaceID
-
-        XCTAssertEqual(state.destination, .documents)
-        XCTAssertEqual(state.documentsRoute, .list)
 
         state.showWorkspaceDocuments(workspaceID)
 
         XCTAssertEqual(state.destination, .documents)
-        XCTAssertEqual(state.documentsRoute, .detail)
-
-        state.showWorkspaceList()
-
-        XCTAssertEqual(state.documentsRoute, .list)
+        XCTAssertEqual(state.selectedWorkspaceID, workspaceID)
     }
 
-    func testAuditNavigationShowsWorkspaceListBeforeReportDetail() {
+    func testAuditNavigationOpensSelectedWorkspaceDirectly() {
         let state = AppViewModel(loadSavedState: false, environment: [:])
         let workspaceID = state.selectedWorkspaceID
-
-        state.showAuditList()
-
-        XCTAssertEqual(state.destination, .audit)
-        XCTAssertEqual(state.auditRoute, .list)
 
         state.showWorkspaceAudit(workspaceID)
 
         XCTAssertEqual(state.destination, .audit)
-        XCTAssertEqual(state.auditRoute, .detail)
+        XCTAssertEqual(state.selectedWorkspaceID, workspaceID)
+    }
 
-        state.showAuditList()
+    func testSidebarWorkspaceSelectionPreservesCurrentDetailDestination() {
+        let state = AppViewModel(loadSavedState: false, environment: [:])
+        let sampleID = state.selectedWorkspaceID
+        state.addWorkspace(
+            draft: WorkspaceDraft(
+                school: "Stanford University",
+                program: "Computer Science",
+                degree: "MS",
+                intake: "Fall 2028",
+                applicantName: ""
+            ),
+            analysis: requirementAnalysis(type: .sop, source: "stanford.txt")
+        )
+        let addedID = state.selectedWorkspaceID
 
-        XCTAssertEqual(state.auditRoute, .list)
+        state.showSelectedWorkspaceAudit()
+        state.selectWorkspaceFromSidebar(sampleID)
+
+        XCTAssertEqual(state.selectedWorkspaceID, sampleID)
+        XCTAssertEqual(state.destination, .audit)
+
+        state.destination = .requirements
+        state.selectWorkspaceFromSidebar(addedID)
+
+        XCTAssertEqual(state.selectedWorkspaceID, addedID)
+        XCTAssertEqual(state.destination, .documents)
     }
 
     func testPortfolioOverviewAggregatesAllWorkspacesAndRoutesToFindingOwner() throws {
@@ -355,7 +366,6 @@ final class AppViewModelTests: XCTestCase {
         XCTAssertEqual(state.selectedWorkspaceID, item.workspaceID)
         XCTAssertEqual(state.selectedFindingID, item.finding.id)
         XCTAssertEqual(state.destination, .audit)
-        XCTAssertEqual(state.auditRoute, .detail)
     }
 
     func testDeletingLastWorkspaceIsRejected() {

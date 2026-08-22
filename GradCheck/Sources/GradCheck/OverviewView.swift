@@ -99,8 +99,8 @@ struct OverviewView: View {
                         .tint(.white)
                         .foregroundStyle(GCTheme.brand)
 
-                        Button("전체 지원 목록") {
-                            state.showWorkspaceList()
+                        Button("선택한 지원서 보기") {
+                            state.showSelectedWorkspaceDocuments()
                         }
                         .buttonStyle(.bordered)
                         .tint(.white.opacity(0.9))
@@ -202,7 +202,7 @@ struct OverviewView: View {
         } else if let item = priorityFindings.first {
             state.showPortfolioFinding(item)
         } else {
-            state.showAuditList()
+            state.showSelectedWorkspaceAudit()
         }
     }
 
@@ -216,8 +216,8 @@ struct OverviewView: View {
                         subtitle: "모든 지원서의 BLOCKED와 HUMAN REVIEW를 함께 보여드려요."
                     )
                     Spacer()
-                    Button("검수 목록") {
-                        state.showAuditList()
+                    Button("선택한 검수 보기") {
+                        state.showSelectedWorkspaceAudit()
                     }
                     .buttonStyle(.plain)
                     .font(.system(size: 12, weight: .semibold))
@@ -232,8 +232,8 @@ struct OverviewView: View {
                         message: auditedWorkspaceCount == 0
                             ? "검수할 지원 항목을 선택하면 전체 우선순위가 여기에 모입니다."
                             : "현재 전체 검수 결과에서 수정이 필요한 항목이 없습니다.",
-                        actionTitle: auditedWorkspaceCount == 0 ? "검수 목록" : nil,
-                        action: auditedWorkspaceCount == 0 ? { state.showAuditList() } : nil
+                        actionTitle: auditedWorkspaceCount == 0 ? "선택한 지원서 검수" : nil,
+                        action: auditedWorkspaceCount == 0 ? { state.showSelectedWorkspaceAudit() } : nil
                     )
                 } else {
                     ForEach(Array(priorityFindings.enumerated()), id: \.element.id) { index, item in
@@ -340,7 +340,7 @@ struct OverviewView: View {
                     }
                 }
 
-                Button("전체 지원 목록") { state.showWorkspaceList() }
+                Button("선택한 지원서 보기") { state.showSelectedWorkspaceDocuments() }
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }

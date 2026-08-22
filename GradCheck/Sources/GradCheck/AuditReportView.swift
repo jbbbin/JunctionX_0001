@@ -11,30 +11,13 @@ struct AuditReportView: View {
     }
 
     var body: some View {
-        Group {
-            switch state.auditRoute {
-            case .list:
-                auditList
-            case .detail:
-                auditDetail
-            }
-        }
+        auditDetail
         .onChange(of: filter) { _, newValue in
             guard let selected = state.selectedFinding, newValue.matches(selected) else {
                 state.selectedFindingID = filteredFindings.first?.id
                 return
             }
         }
-    }
-
-    private var auditList: some View {
-        WorkspaceSelectionView(
-            title: "검수 리포트",
-            eyebrow: "AUDITS",
-            subtitle: "검수 결과와 문제별 피드백을 확인할 지원 항목을 선택하세요.",
-            select: state.showWorkspaceAudit
-        )
-        .environmentObject(state)
     }
 
     private var auditDetail: some View {
@@ -65,17 +48,6 @@ struct AuditReportView: View {
 
     private var reportSummary: some View {
         HStack(spacing: 18) {
-            Button {
-                state.showAuditList()
-            } label: {
-                Label("검수 목록", systemImage: "chevron.left")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(GCTheme.brand)
-
-            Divider().frame(height: 28)
-
             VStack(alignment: .leading, spacing: 5) {
                 Text("제출 준비 리포트")
                     .font(.system(size: 18, weight: .bold))
