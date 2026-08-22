@@ -199,7 +199,7 @@ struct OverviewView: View {
                     SectionTitle(
                         "전체 우선 피드백",
                         eyebrow: "PRIORITY",
-                        subtitle: "모든 지원서의 BLOCKED와 HUMAN REVIEW를 함께 보여드려요."
+                        subtitle: "모든 지원서의 보류와 검토를 함께 보여드려요."
                     )
                     Spacer()
                     Button("선택한 검수 보기") {

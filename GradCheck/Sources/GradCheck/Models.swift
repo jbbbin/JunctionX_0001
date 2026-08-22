@@ -20,9 +20,9 @@ enum AppDestination: String, CaseIterable, Identifiable {
 }
 
 enum ReviewStatus: String, Codable, CaseIterable, Identifiable {
-    case blocked = "BLOCKED"
-    case humanReview = "HUMAN REVIEW"
-    case ready = "READY"
+    case blocked = "보류"
+    case humanReview = "검토"
+    case ready = "완료"
 
     var id: Self { self }
 

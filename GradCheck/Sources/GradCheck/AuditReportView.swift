@@ -168,9 +168,9 @@ private enum FindingFilter: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .all: "전체"
-        case .blocked: "BLOCKED"
-        case .review: "REVIEW"
-        case .ready: "READY"
+        case .blocked: "보류"
+        case .review: "검토"
+        case .ready: "완료"
         }
     }
 

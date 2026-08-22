@@ -537,7 +537,7 @@ final class AppViewModel: ObservableObject {
                 self.successMessage = "업로드된 근거 기준으로 모든 항목을 확인했어요."
                 self.dismissSuccessMessageLater()
             } else if self.blockedCount == 0 {
-                self.successMessage = "BLOCKED는 없어요. HUMAN REVIEW 항목을 직접 확인해 주세요."
+                self.successMessage = "보류 항목은 없어요. 검토 항목을 직접 확인해 주세요."
                 self.dismissSuccessMessageLater()
             }
         }
@@ -551,7 +551,7 @@ final class AppViewModel: ObservableObject {
             "- 지원 목표: \(workspace.school) · \(workspace.program) · \(workspace.degree)",
             "- 입학 학기: \(workspace.intake)",
             "- 생성 시각: \(date)",
-            "- 결과: BLOCKED \(blockedCount) · HUMAN REVIEW \(humanReviewCount) · READY \(readyCount)",
+            "- 결과: 보류 \(blockedCount) · 검토 \(humanReviewCount) · 완료 \(readyCount)",
             "",
             "> 이 리포트는 업로드된 문서의 제출 전 QA 결과이며 합격, 공식성, 비자 승인 등을 판단하지 않습니다.",
             ""
