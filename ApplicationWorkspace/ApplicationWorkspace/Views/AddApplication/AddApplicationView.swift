@@ -15,6 +15,10 @@ struct AddApplicationView: View {
             Divider()
 
             VStack(spacing: 24) {
+                if viewModel.showsLocalAPIKeySettings {
+                    upstageConnectionCard
+                }
+
                 if let sourceDisplayName = viewModel.sourceDisplayName {
                     analysisContent(sourceDisplayName: sourceDisplayName)
                 } else {
@@ -24,11 +28,11 @@ struct AddApplicationView: View {
             .padding(32)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 640, height: 590)
+        .frame(width: 640, height: 690)
         .background(Color.awCanvas)
         .fileImporter(
             isPresented: $viewModel.isShowingImporter,
-            allowedContentTypes: [.pdf, .image],
+            allowedContentTypes: supportedSourceTypes,
             allowsMultipleSelection: false,
             onCompletion: viewModel.handleFileImport
         )
@@ -41,6 +45,76 @@ struct AddApplicationView: View {
         .onChange(of: viewModel.completedApplicationID) { _, applicationID in
             guard let applicationID else { return }
             onCompleted(applicationID)
+        }
+    }
+
+    private var supportedSourceTypes: [UTType] {
+        [.pdf, .image] + ["docx", "pptx", "xlsx", "hwp", "hwpx"]
+            .compactMap { UTType(filenameExtension: $0) }
+    }
+
+    private var upstageConnectionCard: some View {
+        SectionCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: viewModel.isAPIKeyConfigured ? "checkmark.shield.fill" : "key.fill")
+                        .foregroundStyle(viewModel.isAPIKeyConfigured ? Color.green : Color.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(viewModel.isAPIKeyConfigured ? "Upstage 로컬 연결됨" : "Upstage API 키 설정")
+                            .font(.subheadline.weight(.bold))
+                        Text(
+                            viewModel.isAPIKeyManagedByEnvironment
+                                ? "UPSTAGE_API_KEY 환경 변수로 연결돼요."
+                                : "직접 입력한 키는 이 Mac의 Keychain에만 저장돼요."
+                        )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+
+                    if viewModel.isAPIKeyConfigured
+                        && !viewModel.isEditingAPIKey
+                        && !viewModel.isAPIKeyManagedByEnvironment {
+                        Button("키 변경", action: viewModel.editAPIKey)
+                            .buttonStyle(.borderless)
+                    }
+                }
+
+                if viewModel.isEditingAPIKey {
+                    HStack(spacing: 10) {
+                        SecureField("up_...", text: $viewModel.apiKeyDraft)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit(viewModel.saveAPIKey)
+                        Button("저장", action: viewModel.saveAPIKey)
+                            .buttonStyle(SecondaryButtonStyle())
+                            .disabled(
+                                viewModel.apiKeyDraft
+                                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                                    .isEmpty
+                            )
+                        if viewModel.isAPIKeyConfigured {
+                            Button("취소", action: viewModel.cancelAPIKeyEditing)
+                                .buttonStyle(.borderless)
+                        }
+                    }
+
+                }
+
+                if let apiKeyMessage = viewModel.apiKeyMessage {
+                    Label(apiKeyMessage, systemImage: "exclamationmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "lock.shield")
+                    Text("분석 시 선택한 원문과 자격 판단용 프로필 정보가 Upstage API로 전송됩니다.")
+                    Spacer(minLength: 8)
+                    Link("API 키 발급", destination: URL(string: "https://console.upstage.ai/api-keys")!)
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -93,6 +167,7 @@ struct AddApplicationView: View {
                 Label("모집요강 파일 선택", systemImage: "folder")
             }
             .buttonStyle(PrimaryButtonStyle())
+            .disabled(viewModel.requiresAPIKeySetup)
 
             HStack(spacing: 10) {
                 Rectangle()
@@ -127,7 +202,10 @@ struct AddApplicationView: View {
 
                 Button("분석하기", action: viewModel.analyzeURL)
                     .buttonStyle(SecondaryButtonStyle())
-                    .disabled(viewModel.urlDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        viewModel.requiresAPIKeySetup
+                            || viewModel.urlDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
             }
             .frame(maxWidth: 460)
 
@@ -291,6 +369,7 @@ struct AddApplicationView: View {
         switch viewModel.phase {
         case .completed: "checkmark"
         case .failed: "exclamationmark"
+        case .setupRequired: "key.fill"
         case .waiting, .uploading, .classifying, .extracting, .matching: "sparkles"
         }
     }
@@ -298,7 +377,7 @@ struct AddApplicationView: View {
     private var phaseTint: Color {
         switch viewModel.phase {
         case .completed: .green
-        case .failed: .orange
+        case .failed, .setupRequired: .orange
         case .waiting, .uploading, .classifying, .extracting, .matching: .awAccent
         }
     }

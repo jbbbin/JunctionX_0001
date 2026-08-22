@@ -25,8 +25,11 @@ final class DashboardViewModel: StoreBackedViewModel {
 
     var nearestApplication: ApplicationItem? {
         store.applications
-            .filter { !$0.isCompleted && daysRemaining(for: $0) >= 0 }
-            .min { $0.deadline < $1.deadline }
+            .filter {
+                guard let daysRemaining = daysRemaining(for: $0) else { return false }
+                return !$0.isCompleted && daysRemaining >= 0
+            }
+            .min(by: deadlineComesBefore)
     }
 
     var eligibleCount: Int {
@@ -42,7 +45,7 @@ final class DashboardViewModel: StoreBackedViewModel {
             .filter { application in
                 matchesStatus(application) && matchesSearch(application)
             }
-            .sorted { $0.deadline < $1.deadline }
+            .sorted(by: deadlineComesBefore)
     }
 
     var visibleApplications: [ApplicationItem] {
@@ -92,7 +95,10 @@ final class DashboardViewModel: StoreBackedViewModel {
     }
 
     func isSupportedImport(_ url: URL) -> Bool {
-        ["pdf", "png", "jpg", "jpeg", "heic"].contains(url.pathExtension.lowercased())
+        [
+            "pdf", "png", "jpg", "jpeg", "heic", "bmp", "gif", "webp", "tif", "tiff",
+            "docx", "pptx", "xlsx", "hwp", "hwpx",
+        ].contains(url.pathExtension.lowercased())
     }
 
     func compactEligibility(_ state: EligibilityState) -> String {
@@ -103,24 +109,27 @@ final class DashboardViewModel: StoreBackedViewModel {
         }
     }
 
-    func formattedShortDate(_ date: Date) -> String {
-        Self.shortDateFormatter.string(from: date)
+    func formattedShortDate(_ date: Date?) -> String {
+        guard let date else { return "확인 필요" }
+        return Self.shortDateFormatter.string(from: date)
     }
 
-    func formattedDeadline(_ date: Date) -> String {
-        Self.deadlineFormatter.string(from: date)
+    func formattedDeadline(_ date: Date?) -> String {
+        guard let date else { return "마감 확인 필요" }
+        return Self.deadlineFormatter.string(from: date)
     }
 
     private func matchesStatus(_ application: ApplicationItem) -> Bool {
         switch statusFilter {
         case .all, .preparing:
-            !application.isCompleted
+            return !application.isCompleted
         case .urgent:
-            !application.isCompleted && (0...7).contains(daysRemaining(for: application))
+            guard let daysRemaining = daysRemaining(for: application) else { return false }
+            return !application.isCompleted && (0...7).contains(daysRemaining)
         case .needsReview:
-            !application.isCompleted && application.eligibility == .needsReview
+            return !application.isCompleted && application.eligibility == .needsReview
         case .completed:
-            application.isCompleted
+            return application.isCompleted
         }
     }
 
@@ -132,8 +141,22 @@ final class DashboardViewModel: StoreBackedViewModel {
             || application.category.rawValue.localizedCaseInsensitiveContains(query)
     }
 
-    private func daysRemaining(for application: ApplicationItem) -> Int {
+    private func daysRemaining(for application: ApplicationItem) -> Int? {
         application.daysRemaining(relativeTo: now(), calendar: calendar)
+    }
+
+    private func deadlineComesBefore(_ lhs: ApplicationItem, _ rhs: ApplicationItem) -> Bool {
+        switch (lhs.deadline, rhs.deadline) {
+        case let (lhsDeadline?, rhsDeadline?):
+            if lhsDeadline != rhsDeadline { return lhsDeadline < rhsDeadline }
+            return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+        case (_?, nil):
+            return true
+        case (nil, _?):
+            return false
+        case (nil, nil):
+            return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+        }
     }
 
     private static let shortDateFormatter: DateFormatter = {

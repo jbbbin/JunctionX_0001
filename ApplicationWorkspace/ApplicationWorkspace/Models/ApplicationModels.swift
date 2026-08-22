@@ -149,7 +149,7 @@ struct ApplicationItem: Identifiable, Hashable {
     var category: ApplicationCategory
     var title: String
     var organization: String
-    var deadline: Date
+    var deadline: Date?
     var eligibility: EligibilityState
     var requirements: [EligibilityRequirement]
     var requiredDocuments: [RequiredDocument]
@@ -161,7 +161,7 @@ struct ApplicationItem: Identifiable, Hashable {
         category: ApplicationCategory,
         title: String,
         organization: String,
-        deadline: Date,
+        deadline: Date?,
         eligibility: EligibilityState,
         requirements: [EligibilityRequirement],
         requiredDocuments: [RequiredDocument],
@@ -202,7 +202,8 @@ struct ApplicationItem: Identifiable, Hashable {
     }
 
     var isReadyToSubmit: Bool {
-        eligibility == .eligible
+        deadline != nil
+            && eligibility == .eligible
             && requirements.allSatisfy { $0.state == .satisfied }
             && requiredDocuments.allSatisfy(\.isReady)
     }
@@ -214,6 +215,10 @@ struct ApplicationItem: Identifiable, Hashable {
 
         if let requirement = requirements.first(where: { $0.state == .needsReview }) {
             return "\(requirement.title) 조건을 확인해 주세요"
+        }
+
+        if deadline == nil {
+            return "마감일을 확인해 주세요"
         }
 
         if let document = requiredDocuments.first(where: { !$0.isReady }) {
@@ -231,18 +236,20 @@ struct ApplicationItem: Identifiable, Hashable {
         return isReadyToSubmit ? "공식 접수처에서 제출해 주세요" : "자격 조건을 확인해 주세요"
     }
 
-    func daysRemaining(relativeTo now: Date = Date(), calendar: Calendar = .current) -> Int {
-        calendar.dateComponents(
+    func daysRemaining(relativeTo now: Date = Date(), calendar: Calendar = .current) -> Int? {
+        guard let deadline else { return nil }
+        return calendar.dateComponents(
             [.day],
             from: calendar.startOfDay(for: now),
             to: calendar.startOfDay(for: deadline)
         ).day ?? 0
     }
 
-    var daysRemaining: Int { daysRemaining() }
+    var daysRemaining: Int? { daysRemaining() }
 
     var dDayText: String {
-        switch daysRemaining {
+        guard let daysRemaining else { return "마감 확인 필요" }
+        return switch daysRemaining {
         case let value where value > 0: "D-\(value)"
         case 0: "D-Day"
         default: "마감"

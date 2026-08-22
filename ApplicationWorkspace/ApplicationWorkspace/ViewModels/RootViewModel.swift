@@ -76,7 +76,8 @@ final class RootViewModel: StoreBackedViewModel {
         addApplicationViewModel = AddApplicationViewModel(
             source: source,
             store: store,
-            analyzer: dependencies.applicationAnalyzer
+            analyzer: dependencies.applicationAnalyzer,
+            credentialStore: dependencies.localAnalysisCredentialStore
         )
         isPresentingAddApplication = true
     }

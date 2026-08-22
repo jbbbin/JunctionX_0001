@@ -212,12 +212,14 @@ final class AppStore: ObservableObject {
                 guard !required.isReady,
                       required.preparationType == .owned,
                       let owned = ownedDocuments.first(where: {
-                          normalizedDocumentName($0.name) == normalizedDocumentName(required.name)
-                      })
+                          $0.fileURL != nil
+                              && normalizedDocumentName($0.name) == normalizedDocumentName(required.name)
+                      }),
+                      let ownedURL = owned.fileURL
                 else { continue }
 
                 applications[applicationIndex].requiredDocuments[documentIndex].linkedFilename = owned.filename
-                applications[applicationIndex].requiredDocuments[documentIndex].linkedFileURL = owned.fileURL
+                applications[applicationIndex].requiredDocuments[documentIndex].linkedFileURL = ownedURL
                 applications[applicationIndex].requiredDocuments[documentIndex].isReady = true
             }
         }

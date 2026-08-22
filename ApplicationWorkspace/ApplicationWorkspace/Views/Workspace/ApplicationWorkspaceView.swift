@@ -126,13 +126,19 @@ struct ApplicationWorkspaceView: View {
             }
 
             HStack {
-                Text("마감 \(viewModel.formattedDeadline(application.deadline)) · \(application.dDayText)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if application.deadline == nil {
+                    Label("마감 확인 필요", systemImage: "calendar.badge.exclamationmark")
+                        .foregroundStyle(.orange)
+                } else {
+                    Text("마감 \(viewModel.formattedDeadline(application.deadline)) · \(application.dDayText)")
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 Text("준비도 \(application.progressPercent)%")
-                    .font(.caption.monospacedDigit().weight(.bold))
+                    .monospacedDigit()
+                    .fontWeight(.bold)
             }
+            .font(.caption)
 
             ProgressView(value: application.progress)
                 .tint(Color.awAccent)

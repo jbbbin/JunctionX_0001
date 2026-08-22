@@ -168,8 +168,9 @@ final class ApplicationWorkspaceViewModel: StoreBackedViewModel {
         }
     }
 
-    func formattedDeadline(_ date: Date) -> String {
-        Self.deadlineFormatter.string(from: date)
+    func formattedDeadline(_ date: Date?) -> String {
+        guard let date else { return "마감 확인 필요" }
+        return Self.deadlineFormatter.string(from: date)
     }
 
     private static let deadlineFormatter: DateFormatter = {

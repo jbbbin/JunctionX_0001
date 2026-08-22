@@ -1,5 +1,6 @@
 import AppKit
 import PDFKit
+import QuickLookUI
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
@@ -62,7 +63,7 @@ struct SourcePreviewView: View {
         .background(Color.awCanvas)
         .fileImporter(
             isPresented: $isShowingDocumentImporter,
-            allowedContentTypes: [.pdf, .image],
+            allowedContentTypes: supportedSourceTypes,
             allowsMultipleSelection: false
         ) { result in
             guard case let .success(urls) = result, let url = urls.first else { return }
@@ -91,6 +92,11 @@ struct SourcePreviewView: View {
                 browser.loadSourceIfNeeded(applicationURL, force: true)
             }
         }
+    }
+
+    private var supportedSourceTypes: [UTType] {
+        [.pdf, .image] + ["docx", "pptx", "xlsx", "hwp", "hwpx"]
+            .compactMap { UTType(filenameExtension: $0) }
     }
 
     private var obsidianTabBar: some View {
@@ -252,7 +258,13 @@ struct SourcePreviewView: View {
         switch (mode, isCurrentSourceConnected) {
         case (.web, true): "공고 웹 · 원문 연결됨"
         case (.web, false): "공고 웹 · 주소 입력 필요"
-        case (.document, true): selectedDocumentIsImage ? "공고 이미지 · 원문 연결됨" : "공고 PDF · 원문 연결됨"
+        case (.document, true):
+            switch selectedDocumentKind {
+            case .pdf: "공고 PDF · 원문 연결됨"
+            case .image: "공고 이미지 · 원문 연결됨"
+            case .quickLook: "공고 문서 · 원문 연결됨"
+            case .unsupported: "공고 원문 · 미리보기 제한"
+            }
         case (.document, false): "공고 원문 · 파일 선택 필요"
         }
     }
@@ -449,18 +461,36 @@ struct SourcePreviewView: View {
     private var documentContent: some View {
         if let selectedDocumentURL {
             ZStack(alignment: .bottom) {
-                if selectedDocumentIsImage,
-                   let image = NSImage(contentsOf: selectedDocumentURL) {
-                    ScrollView([.horizontal, .vertical]) {
-                        Image(nsImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .padding(28)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                    .background(Color(nsColor: .underPageBackgroundColor))
-                } else {
+                switch selectedDocumentKind {
+                case .pdf:
                     PDFKitContainer(url: selectedDocumentURL, page: requestedPDFPage)
+                case .image:
+                    if let image = loadPreviewImage(at: selectedDocumentURL) {
+                        ScrollView([.horizontal, .vertical]) {
+                            Image(nsImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .padding(28)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        .background(Color(nsColor: .underPageBackgroundColor))
+                    } else {
+                        documentPreviewUnavailable(
+                            url: selectedDocumentURL,
+                            title: "이미지를 미리 볼 수 없어요",
+                            message: "파일이 손상되었거나 macOS에서 지원하지 않는 이미지 형식일 수 있어요.",
+                            icon: "photo.badge.exclamationmark"
+                        )
+                    }
+                case .quickLook:
+                    QuickLookContainer(url: selectedDocumentURL)
+                case .unsupported:
+                    documentPreviewUnavailable(
+                        url: selectedDocumentURL,
+                        title: "이 형식은 미리보기를 지원하지 않아요",
+                        message: "PDF, 이미지, DOCX, PPTX, XLSX, HWP 또는 HWPX 원문을 선택해 주세요.",
+                        icon: "doc.badge.ellipsis"
+                    )
                 }
                 evidenceBar
             }
@@ -471,7 +501,7 @@ struct SourcePreviewView: View {
                     .foregroundStyle(Color.awAccent)
                 Text("모집요강 원문을 연결하세요")
                     .font(.title3.weight(.bold))
-                Text("선택한 PDF나 이미지를 이 패널에서 바로 읽고, 왼쪽 항목과 함께 원문 근거를 확인할 수 있어요.")
+                Text("선택한 PDF, 이미지, Office 또는 HWP 문서를 이 패널에서 바로 읽고, 왼쪽 항목과 함께 원문 근거를 확인할 수 있어요.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -488,14 +518,74 @@ struct SourcePreviewView: View {
         }
     }
 
-    private var selectedDocumentIsImage: Bool {
-        guard let fileExtension = selectedDocumentURL?.pathExtension.lowercased() else { return false }
-        return ["png", "jpg", "jpeg", "heic", "tif", "tiff", "gif", "bmp"].contains(fileExtension)
+    private var selectedDocumentKind: DocumentPreviewKind {
+        guard let fileExtension = selectedDocumentURL?.pathExtension.lowercased() else {
+            return .unsupported
+        }
+
+        switch fileExtension {
+        case "pdf":
+            return .pdf
+        case "png", "jpg", "jpeg", "heic", "tif", "tiff", "gif", "bmp", "webp":
+            return .image
+        case "docx", "pptx", "xlsx", "hwp", "hwpx":
+            return .quickLook
+        default:
+            return .unsupported
+        }
     }
 
     private var documentStatusText: String {
-        guard selectedDocumentURL != nil else { return "원본 PDF나 이미지를 선택해 주세요" }
-        return selectedDocumentIsImage ? "이미지 원문 표시" : "\(requestedPDFPage)페이지 근거 표시"
+        guard selectedDocumentURL != nil else {
+            return "PDF, 이미지, Office 또는 HWP 원문을 선택해 주세요"
+        }
+
+        return switch selectedDocumentKind {
+        case .pdf: "\(requestedPDFPage)페이지 근거 표시"
+        case .image: "이미지 원문 표시"
+        case .quickLook: "macOS Quick Look으로 문서 표시"
+        case .unsupported: "미리보기를 지원하지 않는 파일 형식"
+        }
+    }
+
+    private func loadPreviewImage(at url: URL) -> NSImage? {
+        let isAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if isAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return NSImage(data: data)
+    }
+
+    private func documentPreviewUnavailable(
+        url: URL,
+        title: String,
+        message: String,
+        icon: String
+    ) -> some View {
+        VStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 42))
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.headline)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+            Button {
+                NSWorkspace.shared.open(url)
+            } label: {
+                Label("별도 창에서 열기", systemImage: "arrow.up.right.square")
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.awCanvas)
     }
 
     @ViewBuilder
@@ -529,6 +619,13 @@ struct SourcePreviewView: View {
             .padding(16)
         }
     }
+}
+
+private enum DocumentPreviewKind {
+    case pdf
+    case image
+    case quickLook
+    case unsupported
 }
 
 private struct WebKitContainer: NSViewRepresentable {
@@ -568,10 +665,15 @@ private struct PDFKitContainer: NSViewRepresentable {
         load(url: url, page: page, into: nsView, coordinator: context.coordinator)
     }
 
+    static func dismantleNSView(_ nsView: PDFView, coordinator: Coordinator) {
+        coordinator.stopAccessingResource()
+        nsView.document = nil
+    }
+
     private func load(url: URL, page: Int, into view: PDFView, coordinator: Coordinator) {
         if coordinator.loadedURL != url {
+            coordinator.startAccessingResource(at: url)
             view.document = PDFDocument(url: url)
-            coordinator.loadedURL = url
             coordinator.page = 0
         }
 
@@ -586,7 +688,72 @@ private struct PDFKitContainer: NSViewRepresentable {
     }
 
     final class Coordinator {
-        var loadedURL: URL?
+        private(set) var loadedURL: URL?
         var page = 0
+        private var isAccessingSecurityScopedResource = false
+
+        func startAccessingResource(at url: URL) {
+            stopAccessingResource()
+            loadedURL = url
+            isAccessingSecurityScopedResource = url.startAccessingSecurityScopedResource()
+        }
+
+        func stopAccessingResource() {
+            if isAccessingSecurityScopedResource, let loadedURL {
+                loadedURL.stopAccessingSecurityScopedResource()
+            }
+            isAccessingSecurityScopedResource = false
+            loadedURL = nil
+        }
+    }
+}
+
+private struct QuickLookContainer: NSViewRepresentable {
+    let url: URL
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> QLPreviewView {
+        let view = QLPreviewView(frame: .zero, style: .normal) ?? QLPreviewView(frame: .zero)!
+        view.shouldCloseWithWindow = false
+        update(view, with: url, coordinator: context.coordinator)
+        return view
+    }
+
+    func updateNSView(_ nsView: QLPreviewView, context: Context) {
+        update(nsView, with: url, coordinator: context.coordinator)
+    }
+
+    static func dismantleNSView(_ nsView: QLPreviewView, coordinator: Coordinator) {
+        coordinator.stopAccessingResource()
+        nsView.close()
+    }
+
+    private func update(_ view: QLPreviewView, with url: URL, coordinator: Coordinator) {
+        guard coordinator.loadedURL != url else { return }
+        coordinator.startAccessingResource(at: url)
+        view.previewItem = url as NSURL
+        view.refreshPreviewItem()
+    }
+
+    final class Coordinator {
+        private(set) var loadedURL: URL?
+        private var isAccessingSecurityScopedResource = false
+
+        func startAccessingResource(at url: URL) {
+            stopAccessingResource()
+            loadedURL = url
+            isAccessingSecurityScopedResource = url.startAccessingSecurityScopedResource()
+        }
+
+        func stopAccessingResource() {
+            if isAccessingSecurityScopedResource, let loadedURL {
+                loadedURL.stopAccessingSecurityScopedResource()
+            }
+            isAccessingSecurityScopedResource = false
+            loadedURL = nil
+        }
     }
 }

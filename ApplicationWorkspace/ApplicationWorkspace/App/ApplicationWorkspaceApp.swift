@@ -6,7 +6,7 @@ struct ApplicationWorkspaceApp: App {
 
     init() {
         _viewModel = StateObject(
-            wrappedValue: RootViewModel(dependencies: .prototype())
+            wrappedValue: RootViewModel(dependencies: .localDevelopment())
         )
     }
 

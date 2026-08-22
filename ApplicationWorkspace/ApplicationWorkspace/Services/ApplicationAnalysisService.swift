@@ -11,15 +11,61 @@ enum ApplicationAnalysisError: LocalizedError {
     }
 }
 
+struct EligibilityProfileSnapshot: Codable, Equatable, Sendable {
+    let school: String
+    let enrollmentStatus: String
+    let grade: Int
+    let gpa: String
+    let incomeBracket: String
+    let major: String
+    let region: String
+
+    init(profile: UserProfile) {
+        school = profile.school
+        enrollmentStatus = profile.enrollmentStatus
+        grade = profile.grade
+        gpa = profile.gpa
+        incomeBracket = profile.incomeBracket
+        major = profile.major
+        region = profile.region
+    }
+}
+
+struct OwnedDocumentSnapshot: Codable, Equatable, Sendable {
+    let name: String
+    let type: String
+
+    init(document: OwnedDocument) {
+        name = document.name
+        type = document.type
+    }
+}
+
+struct ApplicationAnalysisContext: Codable, Equatable, Sendable {
+    let profile: EligibilityProfileSnapshot
+    let ownedDocuments: [OwnedDocumentSnapshot]
+
+    init(profile: UserProfile, ownedDocuments: [OwnedDocument]) {
+        self.profile = EligibilityProfileSnapshot(profile: profile)
+        self.ownedDocuments = ownedDocuments.map(OwnedDocumentSnapshot.init)
+    }
+}
+
 @MainActor
 protocol ApplicationAnalyzing {
-    func analyze(source: ImportedSource) async throws -> ApplicationItem
+    func analyze(
+        source: ImportedSource,
+        context: ApplicationAnalysisContext
+    ) async throws -> ApplicationItem
 }
 
 struct MockApplicationAnalysisService: ApplicationAnalyzing {
     var now: () -> Date = Date.init
 
-    func analyze(source: ImportedSource) async throws -> ApplicationItem {
+    func analyze(
+        source: ImportedSource,
+        context: ApplicationAnalysisContext
+    ) async throws -> ApplicationItem {
         let category = inferredCategory(from: source.displayName)
         let deadline = Calendar.current.date(byAdding: .day, value: 10, to: now()) ?? now()
         let evidenceLocation: SourceLocation

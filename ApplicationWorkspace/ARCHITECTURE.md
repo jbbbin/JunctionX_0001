@@ -66,8 +66,16 @@ RootViewModel ── AppDependencies
 다음 구현 단계에서는 View와 ViewModel을 바꾸지 않고 의존성 구현만 교체한다.
 
 1. `ApplicationAnalyzing`
-   - 현재: `MockApplicationAnalysisService`
-   - 이후: Cloud Functions가 Upstage Studio를 호출하고 Firestore 결과를 반환
+   - 현재 앱 실행: `LocalUpstageApplicationAnalysisService`
+     - 파일은 Upstage Document Parse 후 Solar Structured Outputs로 변환
+     - 웹 URL은 쿠키 없는 ephemeral URLSession으로 먼저 읽고, 403 또는 본문이
+       부족하면 fresh non-persistent WKWebView로 공개 JavaScript 본문만 렌더링
+     - 로그인·인증 페이지와 기존 브라우저 세션은 공유하지 않고 PDF 등록 안내
+     - 로컬 키는 `UPSTAGE_API_KEY` 또는 macOS Keychain에서만 조회하며 환경 변수가
+       Keychain보다 우선
+   - 프리뷰·단위 테스트: `MockApplicationAnalysisService`
+   - 이후: 동일한 최소 `ApplicationAnalysisContext` DTO를 받는 Cloud Functions가
+     Upstage를 호출하고 구조화 결과만 반환
 2. `AppStore`
    - 현재: 메모리 기반 샘플 데이터
    - 이후: `ApplicationRepository`, `ProfileRepository`, `DocumentRepository`로
@@ -82,6 +90,11 @@ RootViewModel ── AppDependencies
 SDK를 View 또는 ViewModel에서 직접 호출하지 않는다. Firebase/Upstage 타입은
 Data/Infrastructure 구현 안에만 두어 프리뷰, 단위 테스트와 오프라인 fixture가
 같은 화면 코드를 사용할 수 있게 한다.
+
+`ApplicationAnalysisContext`는 프로필 이름과 로컬 파일명·경로를 제외하고 자격
+판단에 필요한 필드와 보유 문서 표시명·유형만 캡처한다. 로컬 어댑터를 서버
+어댑터로 바꿀 때도 이 최소 전송 규칙을 유지한다. 앱 번들, UserDefaults,
+Info.plist 또는 저장소에는 Upstage API 키를 저장하지 않는다.
 
 ## Product decisions intentionally deferred
 

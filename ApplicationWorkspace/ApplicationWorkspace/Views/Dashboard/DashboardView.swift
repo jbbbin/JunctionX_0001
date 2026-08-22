@@ -28,12 +28,17 @@ struct DashboardView: View {
         .background(Color.awCanvas)
         .fileImporter(
             isPresented: $isShowingImporter,
-            allowedContentTypes: [.pdf, .image],
+            allowedContentTypes: supportedSourceTypes,
             allowsMultipleSelection: false
         ) { result in
             guard case let .success(urls) = result, let url = urls.first else { return }
             onImport(url)
         }
+    }
+
+    private var supportedSourceTypes: [UTType] {
+        [.pdf, .image] + ["docx", "pptx", "xlsx", "hwp", "hwpx"]
+            .compactMap { UTType(filenameExtension: $0) }
     }
 
     private var greeting: some View {
@@ -157,7 +162,7 @@ struct DashboardView: View {
                 Text("공고를 추가하세요")
                     .font(.system(size: 21, weight: .bold))
                 Spacer()
-                Text("PDF · 이미지 · 공고 URL")
+                Text("PDF · 이미지 · Office · HWP · 공고 URL")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

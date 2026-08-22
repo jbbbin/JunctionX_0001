@@ -101,8 +101,10 @@ MVP가 제공해야 하는 핵심 경험은 다음과 같다.
 
 ### 5.1 모집요강 등록
 
-사용자가 PDF·이미지 모집요강 또는 공식 공고 URL 하나를 서비스에 등록한다.
-드래그 앤 드롭은 파일 입력의 보조 수단으로 제공한다.
+사용자가 PDF·이미지·DOCX·PPTX·XLSX·HWP·HWPX 모집요강 또는 공식 공고 URL
+하나를 서비스에 등록한다. 드래그 앤 드롭은 파일 입력의 보조 수단으로 제공한다.
+공개 JavaScript 공고는 비영구 WebKit으로 렌더링하며, 로그인·인증·브라우저
+세션이 필요한 페이지는 PDF로 저장해 등록하도록 안내한다.
 
 ### 5.2 문서 자동 분석
 
@@ -165,7 +167,7 @@ Upstage Studio**를 조합한다.
 
 ```text
 macOS App
-  │ PDF·이미지 업로드 또는 공고 URL 등록
+  │ PDF·이미지·DOCX·PPTX·XLSX·HWP·HWPX 업로드 또는 공고 URL 등록
   ▼
 Firebase Storage
   │ 분석 요청
@@ -191,6 +193,11 @@ Dashboard · Application Workspace
   실시간으로 전달한다.
 - **Secret Manager:** Upstage API 키를 앱과 저장소에 노출하지 않고 함수에만
   제공한다.
+
+서버 이전 전 로컬 검증 빌드는 `ApplicationAnalyzing` 뒤의
+`LocalUpstageApplicationAnalysisService`를 사용한다. 이때 개발자 개인 API 키는
+macOS Keychain 또는 `UPSTAGE_API_KEY` 실행 환경 변수로만 주입하며, 사용자에게
+배포할 팀 공용 키는 앱에 포함하지 않는다.
 - **Security Rules:** 사용자별 문서와 데이터 접근을 제한하고 파일 형식 및
   크기를 검증한다.
 
@@ -221,7 +228,7 @@ Firebase는 서버를 직접 운영하지 않으면서 업로드, 분석 상태�
 
 ### 포함
 
-- [ ] PDF·이미지 모집요강 및 공고 URL 등록
+- [ ] PDF·이미지·DOCX·PPTX·XLSX·HWP·HWPX 모집요강 및 공고 URL 등록
 - [ ] Firebase Authentication 기반 사용자 구분
 - [ ] Firebase Storage 기반 모집요강·보유 문서 업로드
 - [ ] Cloud Functions 기반 Upstage Studio 호출

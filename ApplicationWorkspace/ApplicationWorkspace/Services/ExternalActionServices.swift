@@ -19,10 +19,16 @@ protocol CalendarExporting {
 }
 
 enum CalendarExportError: LocalizedError {
+    case missingDeadline
     case couldNotOpen
 
     var errorDescription: String? {
-        "캘린더 파일을 열지 못했어요. 잠시 후 다시 시도해 주세요."
+        switch self {
+        case .missingDeadline:
+            "마감일을 확인한 뒤 캘린더에 추가해 주세요."
+        case .couldNotOpen:
+            "캘린더 파일을 열지 못했어요. 잠시 후 다시 시도해 주세요."
+        }
     }
 }
 
@@ -36,6 +42,9 @@ struct ICSCalendarExportService: CalendarExporting {
     }()
 
     func openCalendarEvent(for application: ApplicationItem) throws {
+        guard let deadline = application.deadline else {
+            throw CalendarExportError.missingDeadline
+        }
         let escapedTitle = application.title
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: ",", with: "\\,")
@@ -47,8 +56,8 @@ struct ICSCalendarExportService: CalendarExporting {
         BEGIN:VEVENT
         UID:\(application.id.uuidString)@passready.local
         DTSTAMP:\(formatter.string(from: Date()))
-        DTSTART:\(formatter.string(from: application.deadline))
-        DTEND:\(formatter.string(from: application.deadline.addingTimeInterval(1800)))
+        DTSTART:\(formatter.string(from: deadline))
+        DTEND:\(formatter.string(from: deadline.addingTimeInterval(1800)))
         SUMMARY:\(escapedTitle) 마감
         DESCRIPTION:PassReady에서 관리 중인 지원 마감입니다.
         END:VEVENT

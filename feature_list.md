@@ -49,6 +49,12 @@ DashboardView
 
 ### 핵심 사용자 흐름
 
+로컬 개발 현재 흐름:
+
+`문서·URL 1회 등록 → LocalUpstageApplicationAnalysisService → Upstage Document Parse·Solar → AppStore → Workspace 자동 표시`
+
+배포 목표 흐름:
+
 `문서 1회 업로드 → Firebase Storage → Cloud Functions → Upstage Studio → Firestore → Workspace 자동 표시`
 
 사용자가 체감하는 필수 단계는 **문서 업로드 1회**다. 분석 과정은 자동으로
@@ -85,8 +91,9 @@ DashboardView
 
   Feature             설명                                      우선순위
   ------------------- ----------------------------------------- ----------
-  PDF·이미지 선택     Files에서 모집요강 선택                    P0
+  모집요강 파일 선택  PDF·이미지·DOCX·PPTX·XLSX·HWP·HWPX 선택    P0
   공고 URL 입력       웹 공고 주소로 즉시 분석 시작              P0
+  웹 원문 폴백        공개 JS는 비영구 WebKit, 로그인은 PDF 안내 P0
   Storage 업로드      Firebase Storage에 사용자별 경로로 저장     P0
   즉시 분석 시작      업로드 완료 후 별도 버튼 없이 함수 실행     P0
   분야 자동 분류      채용 / 장학금 / 공모전·대회 자동 판별      P0
@@ -295,7 +302,9 @@ MVP에서는 모든 개인정보를 모델링하지 않고 **실제 데모 모�
   Firebase App Check         정상 앱에서 발생한 요청인지 검증           P1
   Budget Alert               Blaze 요금제 사용량 모니터링                P0
 
-Upstage API 키는 macOS 앱, Git 저장소와 일반 `.env` 파일에 저장하지 않는다.
+배포용 팀 공용 Upstage API 키는 macOS 앱, Git 저장소와 일반 `.env` 파일에
+저장하지 않는다. 서버 이전 전 로컬 검증에서만 개발자 개인 키를 macOS
+Keychain 또는 `UPSTAGE_API_KEY` 실행 환경 변수로 주입한다.
 Cloud Functions에서 Secret Manager에 등록된 키만 사용한다.
 
 ### 9.2 처리 상태
@@ -364,14 +373,14 @@ users/{userId}
 
 `Storage 업로드 → Cloud Functions → Upstage Studio → Firestore → ApplicationWorkspaceView`
 
--   PDF·이미지 업로드 또는 URL 등록 1회로 자동 분석 시작
+-   PDF·이미지·DOCX·PPTX·XLSX·HWP·HWPX 업로드 또는 URL 등록 1회로 자동 분석 시작
 -   채용 / 장학금 / 공모전·대회 자동 분류
 -   공통 및 분야별 정보 추출
 -   원문 근거와 확인 필요 상태 생성
 -   D-Day / 지원 가능 상태 / 남은 작업 / 다음 행동 표시
 -   Workspace 자동 저장 및 표시
 
-**목표:** 사용자가 PDF 하나만 넣으면 별도 설정 없이 하나의 Workspace가
+**목표:** 사용자가 공고 원문 하나만 넣으면 별도 설정 없이 하나의 Workspace가
 생성된다.
 
 ### Phase 2 --- Personalization

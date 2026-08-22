@@ -5,6 +5,7 @@ import Foundation
 final class AddApplicationViewModel: ObservableObject {
     enum AnalysisPhase: Int, CaseIterable {
         case waiting
+        case setupRequired
         case uploading
         case classifying
         case extracting
@@ -15,6 +16,7 @@ final class AddApplicationViewModel: ObservableObject {
         var title: String {
             switch self {
             case .waiting: "모집요강을 선택해 주세요"
+            case .setupRequired: "Upstage API 연결이 필요해요"
             case .uploading: "원문을 안전하게 준비하는 중"
             case .classifying: "지원 분야를 분류하는 중"
             case .extracting: "조건과 제출 서류를 읽는 중"
@@ -27,9 +29,10 @@ final class AddApplicationViewModel: ObservableObject {
         var subtitle: String {
             switch self {
             case .waiting: "파일 또는 공고 URL 한 번이면 나머지는 자동으로 진행돼요."
-            case .uploading: "Firebase Storage 연동 전까지 원본 참조를 세션에 안전하게 유지해요."
+            case .setupRequired: "API 키를 이 Mac에 한 번만 저장하면 바로 분석을 시작할 수 있어요."
+            case .uploading: "선택한 원문을 Upstage 분석에 맞게 준비하고 있어요."
             case .classifying: "채용·장학금·공모전 중 알맞은 분야를 찾고 있어요."
-            case .extracting: "Upstage Studio 연결 지점에서 마감일과 요구사항을 구조화해요."
+            case .extracting: "Upstage가 마감일·자격 조건·제출 서류를 구조화하고 있어요."
             case .matching: "이미 가진 문서와 새로 준비할 항목을 나누고 있어요."
             case .completed: "결과 화면으로 바로 이동할게요."
             case .failed: "원본을 확인한 뒤 다시 시도해 주세요."
@@ -38,7 +41,7 @@ final class AddApplicationViewModel: ObservableObject {
 
         var progress: Double {
             switch self {
-            case .waiting: 0
+            case .waiting, .setupRequired: 0
             case .uploading: 0.18
             case .classifying: 0.38
             case .extracting: 0.66
@@ -54,28 +57,46 @@ final class AddApplicationViewModel: ObservableObject {
     @Published var phase: AnalysisPhase = .waiting
     @Published var errorMessage: String?
     @Published var isShowingImporter = false
+    @Published var apiKeyDraft = ""
+    @Published var isEditingAPIKey = false
+    @Published private(set) var isAPIKeyConfigured: Bool
+    @Published private(set) var apiKeyMessage: String?
     @Published private(set) var completedApplicationID: UUID?
 
     private let store: AppStore
     private let analyzer: any ApplicationAnalyzing
     private let addressResolver: BrowserAddressResolver
+    private let credentialStore: (any UpstageAPIKeyStoring)?
     private var analysisTask: Task<Void, Never>?
+    private var analysisGeneration: UUID?
 
     init(
         source: ImportedSource? = nil,
         store: AppStore,
         analyzer: any ApplicationAnalyzing,
+        credentialStore: (any UpstageAPIKeyStoring)? = nil,
         addressResolver: BrowserAddressResolver = BrowserAddressResolver()
     ) {
         self.source = source
         self.store = store
         self.analyzer = analyzer
+        self.credentialStore = credentialStore
         self.addressResolver = addressResolver
-        phase = source == nil ? .waiting : .uploading
+        let isConfigured = credentialStore?.hasAPIKey ?? true
+        isAPIKeyConfigured = isConfigured
+        isEditingAPIKey = credentialStore != nil && !isConfigured
+        phase = isConfigured ? (source == nil ? .waiting : .uploading) : .setupRequired
     }
 
     var sourceDisplayName: String? { source?.displayName }
-    var isAnalyzing: Bool { ![.waiting, .completed, .failed].contains(phase) }
+    var isAnalyzing: Bool { ![.waiting, .setupRequired, .completed, .failed].contains(phase) }
+    var showsLocalAPIKeySettings: Bool { credentialStore != nil }
+    var requiresAPIKeySetup: Bool { showsLocalAPIKeySettings && !isAPIKeyConfigured }
+    var isAPIKeyManagedByEnvironment: Bool {
+        guard let credentialStore else { return false }
+        if case .environment = credentialStore.activeSource { return true }
+        return false
+    }
 
     func startIfNeeded() {
         guard source != nil, analysisTask == nil, completedApplicationID == nil else { return }
@@ -119,9 +140,22 @@ final class AddApplicationViewModel: ObservableObject {
     func beginAnalysis() {
         guard let source else { return }
         analysisTask?.cancel()
+        analysisTask = nil
+        analysisGeneration = nil
         errorMessage = nil
         completedApplicationID = nil
+
+        guard credentialStore?.hasAPIKey ?? true else {
+            isAPIKeyConfigured = false
+            isEditingAPIKey = true
+            phase = .setupRequired
+            return
+        }
+
+        isAPIKeyConfigured = true
         phase = .uploading
+        let generation = UUID()
+        analysisGeneration = generation
 
         analysisTask = Task { [weak self] in
             guard let self else { return }
@@ -129,22 +163,49 @@ final class AddApplicationViewModel: ObservableObject {
                 for (nextPhase, delay) in Self.phaseSequence {
                     try await Task.sleep(nanoseconds: delay)
                     try Task.checkCancellation()
+                    guard analysisGeneration == generation else { return }
                     phase = nextPhase
                 }
 
-                let application = try await analyzer.analyze(source: source)
+                let context = ApplicationAnalysisContext(
+                    profile: store.profile,
+                    ownedDocuments: store.ownedDocuments
+                )
+                let application = try await analyzer.analyze(
+                    source: source,
+                    context: context
+                )
                 try Task.checkCancellation()
+                guard analysisGeneration == generation else { return }
+                phase = .matching
+                try await Task.sleep(nanoseconds: 160_000_000)
+                try Task.checkCancellation()
+                guard analysisGeneration == generation else { return }
+                let applicationID = store.addApplication(application)
                 phase = .completed
-                try await Task.sleep(nanoseconds: 350_000_000)
-                try Task.checkCancellation()
-                completedApplicationID = store.addApplication(application)
+                completedApplicationID = applicationID
                 analysisTask = nil
+                analysisGeneration = nil
             } catch is CancellationError {
+                guard analysisGeneration == generation else { return }
                 analysisTask = nil
+                analysisGeneration = nil
             } catch {
+                guard analysisGeneration == generation else { return }
                 errorMessage = error.localizedDescription
-                phase = .failed
+                if isCredentialError(error) {
+                    let isEnvironmentManaged = isAPIKeyManagedByEnvironment
+                    isAPIKeyConfigured = isEnvironmentManaged
+                    isEditingAPIKey = !isEnvironmentManaged
+                    apiKeyMessage = isEnvironmentManaged
+                        ? "Xcode Scheme의 UPSTAGE_API_KEY 값을 교체한 뒤 앱을 다시 실행해 주세요."
+                        : nil
+                    phase = .setupRequired
+                } else {
+                    phase = .failed
+                }
                 analysisTask = nil
+                analysisGeneration = nil
             }
         }
     }
@@ -155,17 +216,61 @@ final class AddApplicationViewModel: ObservableObject {
         urlDraft = ""
         errorMessage = nil
         completedApplicationID = nil
-        phase = .waiting
+        phase = requiresAPIKeySetup ? .setupRequired : .waiting
+    }
+
+    func editAPIKey() {
+        apiKeyMessage = nil
+        isEditingAPIKey = true
+    }
+
+    func cancelAPIKeyEditing() {
+        apiKeyDraft = ""
+        apiKeyMessage = nil
+        isEditingAPIKey = !isAPIKeyConfigured
+    }
+
+    func saveAPIKey() {
+        guard let credentialStore else { return }
+        let key = apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else {
+            apiKeyMessage = "API 키를 입력해 주세요."
+            return
+        }
+
+        do {
+            try credentialStore.saveAPIKey(key)
+            apiKeyDraft = ""
+            apiKeyMessage = nil
+            isAPIKeyConfigured = credentialStore.hasAPIKey
+            isEditingAPIKey = !isAPIKeyConfigured
+
+            if source != nil {
+                beginAnalysis()
+            } else {
+                phase = .waiting
+            }
+        } catch {
+            apiKeyMessage = error.localizedDescription
+        }
     }
 
     func cancel() {
+        analysisGeneration = nil
         analysisTask?.cancel()
         analysisTask = nil
     }
 
+    private func isCredentialError(_ error: Error) -> Bool {
+        guard let error = error as? UpstageAPIError else { return false }
+        return switch error {
+        case .missingAPIKey, .invalidAPIKey: true
+        default: false
+        }
+    }
+
     private static let phaseSequence: [(AnalysisPhase, UInt64)] = [
-        (.classifying, 350_000_000),
-        (.extracting, 420_000_000),
-        (.matching, 480_000_000)
+        (.classifying, 120_000_000),
+        (.extracting, 100_000_000)
     ]
 }
