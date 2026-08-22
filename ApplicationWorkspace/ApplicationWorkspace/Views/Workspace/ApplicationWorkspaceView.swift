@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct ApplicationWorkspaceView: View {
+struct LegacyApplicationWorkspaceView: View {
     @EnvironmentObject private var store: AppStore
     @State private var isShowingNotice = false
     @State private var noticePage = 1

@@ -18,6 +18,8 @@
 		A10000000000000000000009 /* MyProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* MyProfileView.swift */; };
 		A1000000000000000000000A /* MyDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* MyDocumentsView.swift */; };
 		A1000000000000000000000B /* NoticeViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* NoticeViewerView.swift */; };
+		A1000000000000000000000C /* SourcePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* SourcePreviewView.swift */; };
+		A1000000000000000000000D /* DualApplicationWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* DualApplicationWorkspaceView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +36,8 @@
 		A2000000000000000000000B /* NoticeViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticeViewerView.swift; sourceTree = "<group>"; };
 		A2000000000000000000000C /* ApplicationWorkspace.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ApplicationWorkspace.entitlements; sourceTree = "<group>"; };
 		A2000000000000000000000D /* ApplicationWorkspace.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ApplicationWorkspace.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2000000000000000000000E /* SourcePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourcePreviewView.swift; sourceTree = "<group>"; };
+		A2000000000000000000000F /* DualApplicationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DualApplicationWorkspaceView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -142,6 +146,8 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000008 /* ApplicationWorkspaceView.swift */,
+				A2000000000000000000000F /* DualApplicationWorkspaceView.swift */,
+				A2000000000000000000000E /* SourcePreviewView.swift */,
 			);
 			path = Workspace;
 			sourceTree = "<group>";
@@ -249,6 +255,8 @@
 				A10000000000000000000009 /* MyProfileView.swift in Sources */,
 				A1000000000000000000000A /* MyDocumentsView.swift in Sources */,
 				A1000000000000000000000B /* NoticeViewerView.swift in Sources */,
+				A1000000000000000000000C /* SourcePreviewView.swift in Sources */,
+				A1000000000000000000000D /* DualApplicationWorkspaceView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
