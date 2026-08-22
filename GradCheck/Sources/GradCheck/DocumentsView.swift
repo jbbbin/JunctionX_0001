@@ -74,7 +74,7 @@ struct DocumentsView: View {
 
                 requirementsSourceSummary
 
-                if state.requirements.isEmpty || state.requiredDocumentTypes.isEmpty {
+                if state.requirements.isEmpty {
                     SurfaceCard {
                         EmptyStateView(
                             symbol: "building.columns",
@@ -87,7 +87,7 @@ struct DocumentsView: View {
                 } else {
                     requiredDocumentsCard
                         .allowsHitTesting(!state.isImporting)
-                    extractedChecklistCard
+                    directCheckItemsCard
                 }
                 processingNote
             }
@@ -100,12 +100,13 @@ struct DocumentsView: View {
     private var requiredDocumentsCard: some View {
         SurfaceCard(padding: 0) {
             VStack(spacing: 0) {
-                HStack {
+                HStack(spacing: 12) {
+                    sectionNumber("1", color: GCTheme.brand)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("모집요강 기반 필요 서류")
+                        Text("업로드할 제출 파일")
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(GCTheme.ink)
-                        Text("PDF, TXT, RTF 또는 이미지 · 파일별 최대 처리 시간은 네트워크 환경에 따라 달라집니다.")
+                        Text("성적표·SOP처럼 실제 파일을 추가해야 하는 모집요강 항목입니다.")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -119,33 +120,47 @@ struct DocumentsView: View {
                         .clipShape(Capsule())
                 }
                 .padding(20)
+                .background(GCTheme.brand.opacity(0.035))
 
                 Divider()
 
-                VStack(spacing: 0) {
-                    ForEach(Array(state.requiredDocumentTypes.enumerated()), id: \.element.id) { index, type in
-                        DocumentSlotRow(
-                            type: type,
-                            documents: state.documents.filter { $0.type == type },
-                            expectedCount: state.requiredCount(for: type),
-                            replace: {
-                                importTarget = type
-                                showImporter = true
-                            },
-                            remove: { state.removeDocument($0) },
-                            sampleRevision: type == .sop && state.workspace.isSample
-                                ? { state.applyRevisedSampleSOP() }
-                                : nil,
-                            dropped: { urls in
-                                state.importDocuments(urls, as: type)
-                            }
-                        )
-                        if index < state.requiredDocumentTypes.count - 1 { Divider().padding(.leading, 74) }
+                if state.requiredDocumentTypes.isEmpty {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(ReviewStatus.ready.color)
+                        Text("이 모집요강에는 별도로 업로드할 제출 파일이 없습니다.")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Spacer()
                     }
-                }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(state.requiredDocumentTypes.enumerated()), id: \.element.id) { index, type in
+                            DocumentSlotRow(
+                                type: type,
+                                documents: state.documents.filter { $0.type == type },
+                                expectedCount: state.requiredCount(for: type),
+                                replace: {
+                                    importTarget = type
+                                    showImporter = true
+                                },
+                                remove: { state.removeDocument($0) },
+                                sampleRevision: type == .sop && state.workspace.isSample
+                                    ? { state.applyRevisedSampleSOP() }
+                                    : nil,
+                                dropped: { urls in
+                                    state.importDocuments(urls, as: type)
+                                }
+                            )
+                            if index < state.requiredDocumentTypes.count - 1 { Divider().padding(.leading, 74) }
+                        }
+                    }
 
-                dropZone
-                    .padding(18)
+                    dropZone
+                        .padding(18)
+                }
             }
         }
     }
@@ -204,59 +219,86 @@ struct DocumentsView: View {
         }
     }
 
-    /// Keeps every Agent-extracted requirement visible beside the upload slots.
-    /// Some requirements (for example an online form or an application fee) do
-    /// not have a user-uploadable file type, but still belong in the checklist.
-    private var extractedChecklistCard: some View {
-        let values = state.requirements.filter { $0.effectiveNecessity != .informational }
+    /// Requirements without an uploadable document type belong here instead of
+    /// being repeated in the file slots above.
+    private var directCheckItemsCard: some View {
+        let values = state.requirements.filter {
+            $0.effectiveNecessity != .informational && $0.relatedDocumentType == nil
+        }
+        let accent = ReviewStatus.humanReview.color
         return SurfaceCard(padding: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
+                HStack(spacing: 12) {
+                    sectionNumber("2", color: accent)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("모집요강에서 추출한 전체 체크리스트")
+                        Text("파일 없이 직접 확인할 항목")
                             .font(.system(size: 15, weight: .bold))
-                        Text("파일 업로드가 필요 없는 지원서·수수료 등도 함께 확인하세요.")
+                        Text("온라인 지원서·수수료·제출 방식처럼 파일을 올리지 않는 요건입니다.")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
                     Text("\(values.count)개")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(GCTheme.brand)
+                        .foregroundStyle(accent)
                 }
                 .padding(20)
+                .background(accent.opacity(0.035))
 
                 Divider()
 
-                ForEach(Array(values.enumerated()), id: \.element.id) { index, requirement in
-                    HStack(alignment: .top, spacing: 11) {
-                        Image(systemName: requirement.effectiveNecessity == .conditional ? "exclamationmark.circle.fill" : "checkmark.circle")
-                            .foregroundStyle(requirement.effectiveNecessity == .conditional ? ReviewStatus.humanReview.color : GCTheme.brand)
-                            .padding(.top, 1)
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 7) {
-                                Text(requirement.title)
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text(requirement.effectiveNecessity.rawValue)
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(requirement.effectiveNecessity == .conditional ? ReviewStatus.humanReview.color : ReviewStatus.ready.color)
-                            }
-                            Text(requirement.detail)
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Text(requirement.page.map { "\(requirement.sourceName) · p.\($0)" } ?? requirement.sourceName)
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(GCTheme.secondaryInk)
-                        }
-                        Spacer(minLength: 0)
+                if values.isEmpty {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(ReviewStatus.ready.color)
+                        Text("이 모집요강에는 파일 외에 따로 확인할 항목이 없습니다.")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Spacer()
                     }
                     .padding(.horizontal, 20)
-                    .padding(.vertical, 13)
-                    if index < values.count - 1 { Divider().padding(.leading, 48) }
+                    .padding(.vertical, 16)
+                } else {
+                    ForEach(Array(values.enumerated()), id: \.element.id) { index, requirement in
+                        HStack(alignment: .top, spacing: 11) {
+                            Image(systemName: requirement.effectiveNecessity == .conditional ? "exclamationmark.circle.fill" : "checkmark.square")
+                                .foregroundStyle(requirement.effectiveNecessity == .conditional ? accent : GCTheme.brand)
+                                .padding(.top, 1)
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 7) {
+                                    Text(requirement.title)
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Text(requirement.effectiveNecessity.rawValue)
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(requirement.effectiveNecessity == .conditional ? accent : ReviewStatus.ready.color)
+                                }
+                                Text(requirement.detail)
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text(requirement.page.map { "\(requirement.sourceName) · p.\($0)" } ?? requirement.sourceName)
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(GCTheme.secondaryInk)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 13)
+                        if index < values.count - 1 { Divider().padding(.leading, 48) }
+                    }
                 }
             }
         }
+    }
+
+    private func sectionNumber(_ value: String, color: Color) -> some View {
+        Text(value)
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .frame(width: 24, height: 24)
+            .background(color)
+            .clipShape(Circle())
+            .accessibilityHidden(true)
     }
 
     private var dropZone: some View {
