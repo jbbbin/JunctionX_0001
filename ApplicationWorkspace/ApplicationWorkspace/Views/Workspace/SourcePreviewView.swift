@@ -16,6 +16,8 @@ struct SourcePreviewView: View {
     @State private var selectedPDFURL: URL?
     @State private var isShowingPDFImporter = false
     @State private var isPDFTabVisible = true
+    @State private var addressDraft = ""
+    @FocusState private var isAddressFieldFocused: Bool
 
     @Binding var mode: SourcePreviewMode
     @Binding var evidenceTitle: String?
@@ -49,6 +51,18 @@ struct SourcePreviewView: View {
             guard case let .success(urls) = result, let url = urls.first else { return }
             selectedPDFURL = url
             mode = .pdf
+        }
+        .onAppear {
+            if addressDraft.isEmpty {
+                addressDraft = browser.currentAddress.isEmpty
+                    ? (applicationURL?.absoluteString ?? "")
+                    : browser.currentAddress
+            }
+        }
+        .onChange(of: browser.currentAddress) { _, newAddress in
+            if !isAddressFieldFocused {
+                addressDraft = newAddress
+            }
         }
     }
 
@@ -194,7 +208,7 @@ struct SourcePreviewView: View {
     }
 
     private var webTabTitle: String {
-        applicationURL?.host() ?? "웹 공고"
+        browser.currentURL?.host() ?? applicationURL?.host() ?? "웹 공고"
     }
 
     private var webToolbar: some View {
@@ -223,12 +237,37 @@ struct SourcePreviewView: View {
                 Circle()
                     .fill(browser.isLoading ? Color.orange : Color.green)
                     .frame(width: 7, height: 7)
-                Text(browser.currentAddress.isEmpty ? (applicationURL?.absoluteString ?? "연결할 웹 주소가 없습니다") : browser.currentAddress)
+
+                TextField(
+                    "URL 또는 검색어 입력",
+                    text: $addressDraft
+                )
+                    .textFieldStyle(.plain)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .textSelection(.enabled)
+                    .focused($isAddressFieldFocused)
+                    .onChange(of: isAddressFieldFocused) { _, isFocused in
+                        if !isFocused {
+                            addressDraft = browser.currentAddress
+                        }
+                    }
+                    .onSubmit {
+                        browser.navigateFromAddressBar(addressDraft)
+                        isAddressFieldFocused = false
+                    }
+
                 Spacer(minLength: 0)
+
+                if isAddressFieldFocused || addressDraft != browser.currentAddress {
+                    Button {
+                        browser.navigateFromAddressBar(addressDraft)
+                        isAddressFieldFocused = false
+                    } label: {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .foregroundStyle(Color.awAccent)
+                    }
+                    .buttonStyle(.plain)
+                    .help("이 주소로 이동")
+                }
             }
             .padding(.horizontal, 13)
             .frame(height: 32)
@@ -366,7 +405,7 @@ struct SourcePreviewView: View {
 }
 
 @MainActor
-private final class BrowserController: NSObject, ObservableObject, WKNavigationDelegate {
+private final class BrowserController: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
     @Published var canGoBack = false
     @Published var canGoForward = false
     @Published var isLoading = false
@@ -374,20 +413,31 @@ private final class BrowserController: NSObject, ObservableObject, WKNavigationD
     @Published var currentURL: URL?
 
     let webView: WKWebView
+    private var sourceURL: URL?
     private var requestedURL: URL?
 
     override init() {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
         webView.navigationDelegate = self
+        webView.uiDelegate = self
         webView.allowsMagnification = true
     }
 
     func loadIfNeeded(_ url: URL) {
-        guard requestedURL != url else { return }
+        guard sourceURL != url else { return }
+        sourceURL = url
         requestedURL = url
+        webView.load(URLRequest(url: url))
+    }
+
+    func navigateFromAddressBar(_ value: String) {
+        guard let url = resolvedURL(from: value) else { return }
+        requestedURL = url
+        currentAddress = url.absoluteString
         webView.load(URLRequest(url: url))
     }
 
@@ -406,6 +456,87 @@ private final class BrowserController: NSObject, ObservableObject, WKNavigationD
             webView.reload()
         } else if let requestedURL {
             webView.load(URLRequest(url: requestedURL))
+        }
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        if navigationAction.targetFrame == nil {
+            requestedURL = navigationAction.request.url
+            webView.load(navigationAction.request)
+            decisionHandler(.cancel)
+            return
+        }
+
+        if navigationAction.targetFrame?.isMainFrame == true {
+            requestedURL = navigationAction.request.url
+        }
+
+        decisionHandler(.allow)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        guard navigationAction.targetFrame == nil else { return nil }
+        requestedURL = navigationAction.request.url
+        webView.load(navigationAction.request)
+        return nil
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptAlertPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping () -> Void
+    ) {
+        let alert = NSAlert()
+        alert.messageText = frame.request.url?.host() ?? "웹페이지 알림"
+        alert.informativeText = message
+        alert.addButton(withTitle: "확인")
+        present(alert, in: webView) { _ in completionHandler() }
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptConfirmPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        let alert = NSAlert()
+        alert.messageText = frame.request.url?.host() ?? "웹페이지 확인"
+        alert.informativeText = message
+        alert.addButton(withTitle: "확인")
+        alert.addButton(withTitle: "취소")
+        present(alert, in: webView) { response in
+            completionHandler(response == .alertFirstButtonReturn)
+        }
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptTextInputPanelWithPrompt prompt: String,
+        defaultText: String?,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping (String?) -> Void
+    ) {
+        let input = NSTextField(string: defaultText ?? "")
+        input.frame = NSRect(x: 0, y: 0, width: 320, height: 24)
+
+        let alert = NSAlert()
+        alert.messageText = frame.request.url?.host() ?? "웹페이지 입력"
+        alert.informativeText = prompt
+        alert.accessoryView = input
+        alert.addButton(withTitle: "확인")
+        alert.addButton(withTitle: "취소")
+        present(alert, in: webView) { response in
+            completionHandler(response == .alertFirstButtonReturn ? input.stringValue : nil)
         }
     }
 
@@ -438,7 +569,42 @@ private final class BrowserController: NSObject, ObservableObject, WKNavigationD
         canGoForward = webView.canGoForward
         isLoading = loading
         currentURL = webView.url
-        currentAddress = webView.url?.absoluteString ?? requestedURL?.absoluteString ?? ""
+        let displayedURL = loading
+            ? (requestedURL ?? webView.url)
+            : (webView.url ?? requestedURL)
+        currentAddress = displayedURL?.absoluteString ?? ""
+    }
+
+    private func resolvedURL(from rawValue: String) -> URL? {
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+
+        if let directURL = URL(string: value), directURL.scheme != nil {
+            return directURL
+        }
+
+        let looksLikeAddress = !value.contains(" ")
+            && (value.contains(".") || value.contains(":") || value.hasPrefix("localhost"))
+
+        if looksLikeAddress, let url = URL(string: "https://\(value)") {
+            return url
+        }
+
+        var components = URLComponents(string: "https://www.google.com/search")
+        components?.queryItems = [URLQueryItem(name: "q", value: value)]
+        return components?.url
+    }
+
+    private func present(
+        _ alert: NSAlert,
+        in webView: WKWebView,
+        completion: @escaping (NSApplication.ModalResponse) -> Void
+    ) {
+        if let window = webView.window {
+            alert.beginSheetModal(for: window, completionHandler: completion)
+        } else {
+            completion(alert.runModal())
+        }
     }
 }
 
