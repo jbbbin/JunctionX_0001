@@ -91,22 +91,8 @@ struct OverviewView: View {
                         .foregroundStyle(.white.opacity(0.76))
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: 610, alignment: .leading)
-                    HStack(spacing: 10) {
-                        Button(action: performHeroAction) {
-                            Label(heroActionTitle, systemImage: "arrow.right")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.white)
-                        .foregroundStyle(GCTheme.brand)
-
-                        Button("선택한 지원서 보기") {
-                            state.showSelectedWorkspaceDocuments()
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(.white.opacity(0.9))
-                        .foregroundStyle(.white)
-                    }
                 }
+                
                 Spacer()
                 VStack(alignment: .center, spacing: 5) {
                     Text("\(summaries.count)")
@@ -349,9 +335,7 @@ struct OverviewView: View {
 
     private var safetyNote: some View {
         HStack(alignment: .top, spacing: 11) {
-            Image(systemName: "hand.raised.fill")
-                .foregroundStyle(GCTheme.brand)
-            Text("GradCheck는 업로드된 문서의 누락과 불일치를 확인하는 제출 전 QA 도구입니다. 합격 가능성, 공식 발급 여부, 학점 환산, 영어 면제 또는 비자 승인을 판단하지 않습니다.")
+            Text("UpCheck는 업로드된 문서의 누락과 불일치를 확인하는 제출 전 QA 도구입니다. 합격 가능성, 공식 발급 여부, 학점 환산, 영어 면제 또는 비자 승인을 판단하지 않습니다.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -492,7 +492,7 @@ struct AuditEngine {
                         category: .score,
                         title: "GPA 기준 척도가 명시되지 않았어요",
                         summary: "GPA 값은 확인했지만 만점 기준을 자동으로 확인하지 못했습니다.",
-                        action: "공식 grading scale을 확인하세요. GradCheck는 학점을 임의 환산하지 않습니다.",
+                        action: "공식 grading scale을 확인하세요. UpCheck는 학점을 임의 환산하지 않습니다.",
                         evidences: [gpas[0].evidence(label: "누적 GPA")]
                     )
                 )

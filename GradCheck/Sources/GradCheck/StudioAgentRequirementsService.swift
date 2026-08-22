@@ -200,7 +200,7 @@ struct StudioAgentRequirementsService: GraduateRequirementsAnalyzing {
 
     var providerLabel: String {
         guard let agent else { return "Upstage Studio Agent 설정 필요" }
-        return "Upstage Studio · \(agent.displayName)"
+        return ""
     }
 
     var hasAPIKey: Bool {

@@ -3,16 +3,16 @@ import SwiftUI
 struct SidebarView: View {
     @EnvironmentObject private var state: AppViewModel
     @State private var pendingDeletion: ApplicationWorkspace?
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             brand
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
                 .padding(.bottom, 20)
-
+            
             applicationSectionHeader
-
+            
             ScrollView {
                 LazyVStack(spacing: 6) {
                     ForEach(state.workspaces) { workspace in
@@ -22,27 +22,28 @@ struct SidebarView: View {
                 .padding(.horizontal, 10)
             }
             .scrollIndicators(.hidden)
-            .frame(maxHeight: 230)
-
+            .frame(maxHeight: 202)
+            
             Divider()
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
-
+            
             VStack(spacing: 4) {
                 navigationButton(.overview)
                 supportDocumentsButton
                 auditButton
             }
             .padding(.horizontal, 10)
-
+            
             Spacer(minLength: 16)
 
             Divider()
                 .padding(.horizontal, 18)
 
-            connectionCard
+            profileFooter
                 .padding(.horizontal, 18)
-                .padding(.vertical, 14)
+                .padding(.vertical, 16)
+            
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .alert(
@@ -62,7 +63,7 @@ struct SidebarView: View {
             Text("\(workspace.school) · \(workspace.program)의 모집요강, 서류 목록과 검수 이력이 이 Mac에서 삭제됩니다.")
         }
     }
-
+    
     private var applicationSectionHeader: some View {
         HStack(spacing: 8) {
             Text("APPLICATION")
@@ -87,10 +88,10 @@ struct SidebarView: View {
         .padding(.trailing, 15)
         .padding(.bottom, 8)
     }
-
+    
     private var supportDocumentsButton: some View {
         let isSelected = state.destination == .documents || state.destination == .requirements
-
+        
         return Button {
             state.showSelectedWorkspaceDocuments()
         } label: {
@@ -100,10 +101,10 @@ struct SidebarView: View {
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
-
+    
     private func navigationButton(_ destination: AppDestination) -> some View {
         let isSelected = state.destination == destination
-
+        
         return Button {
             state.destination = destination
         } label: {
@@ -113,10 +114,10 @@ struct SidebarView: View {
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
-
+    
     private var auditButton: some View {
         let isSelected = state.destination == .audit
-
+        
         return Button {
             state.showSelectedWorkspaceAudit()
         } label: {
@@ -126,10 +127,10 @@ struct SidebarView: View {
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
-
+    
     private func applicationCard(_ workspace: ApplicationWorkspace) -> some View {
         let isSelected = workspace.id == state.selectedWorkspaceID
-
+        
         return ZStack(alignment: .topTrailing) {
             Button {
                 state.selectWorkspaceFromSidebar(workspace.id)
@@ -185,7 +186,7 @@ struct SidebarView: View {
             }
             .buttonStyle(.plain)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
-
+            
             Menu {
                 Button(role: .destructive) {
                     pendingDeletion = workspace
@@ -206,7 +207,7 @@ struct SidebarView: View {
             .help(state.workspaces.count <= 1 ? "마지막 지원 항목은 삭제할 수 없습니다." : "지원 항목 관리")
         }
     }
-
+    
     private func navigationLabel(for destination: AppDestination, isSelected: Bool) -> some View {
         HStack(spacing: 11) {
             Image(systemName: destination.symbol)
@@ -229,7 +230,7 @@ struct SidebarView: View {
         .padding(.vertical, 10)
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
-
+    
     private var brand: some View {
         HStack(spacing: 10) {
             ZStack {
@@ -241,32 +242,28 @@ struct SidebarView: View {
             }
             .frame(width: 36, height: 36)
             VStack(alignment: .leading, spacing: 1) {
-                Text("GradCheck")
+                Text("UpCheck")
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(GCTheme.ink)
-                Text("PRE-SUBMISSION QA")
-                    .font(.system(size: 8, weight: .bold, design: .rounded))
-                    .tracking(0.8)
-                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    private var connectionCard: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(state.isUpstageConnected ? ReviewStatus.ready.color : Color.secondary)
-                    .frame(width: 7, height: 7)
-                Text(state.providerLabel)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(GCTheme.secondaryInk)
-                    .lineLimit(1)
-            }
-            Text(state.isUpstageConnected ? "문서는 연결된 Document Parse로 분석됩니다." : "PDF 텍스트는 이 Mac에서만 읽습니다.")
-                .font(.system(size: 10))
+    private var profileFooter: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 30, weight: .regular))
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("김민준")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(GCTheme.secondaryInk)
+                Text("minjan.kim@example.com")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
         }
     }
 }

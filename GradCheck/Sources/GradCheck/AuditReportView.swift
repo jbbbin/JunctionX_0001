@@ -60,13 +60,13 @@ struct AuditReportView: View {
             ReportCount(status: .blocked, count: state.blockedCount)
             ReportCount(status: .humanReview, count: state.humanReviewCount)
             ReportCount(status: .ready, count: state.readyCount)
-            Divider().frame(height: 28)
-            Button {
-                exportChecklist()
-            } label: {
-                Label("체크리스트 내보내기", systemImage: "square.and.arrow.up")
-            }
-            .buttonStyle(.bordered)
+//            Divider().frame(height: 28)
+//            Button {
+//                exportChecklist()
+//            } label: {
+//                Label("체크리스트 내보내기", systemImage: "square.and.arrow.up")
+//            }
+//            .buttonStyle(.bordered)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 15)

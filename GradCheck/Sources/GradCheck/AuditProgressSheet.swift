@@ -9,7 +9,7 @@ struct AuditProgressSheet: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
                         .fill(GCTheme.brandSoft)
-                    Image(systemName: "sparkles")
+                    Image(systemName: "checkmark")
                         .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(GCTheme.brand)
                 }
@@ -37,7 +37,7 @@ struct AuditProgressSheet: View {
                 }
             }
 
-            Text("GradCheck는 합격 가능성을 평가하거나 원서를 대신 작성하지 않습니다.")
+            Text("UpCheck는 합격 가능성을 평가하거나 원서를 대신 작성하지 않습니다.")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .padding(.top, 22)

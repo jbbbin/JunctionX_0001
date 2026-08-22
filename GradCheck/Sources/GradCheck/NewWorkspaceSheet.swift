@@ -111,16 +111,16 @@ struct NewWorkspaceSheet: View {
     private var targetStep: some View {
         Form {
             Section("지원 대상") {
-                TextField("학교명", text: $model.school, prompt: Text("예: MIT"))
-                TextField("프로그램명", text: $model.program, prompt: Text("예: Electrical Engineering & Computer Science"))
+                TextField("학교명", text: $model.school, prompt: Text("OOO University"))
+                TextField("프로그램명", text: $model.program, prompt: Text("Computer Science"))
                 Picker("학위 과정", selection: $model.degree) {
                     ForEach(["PhD", "MS", "MA", "MEng", "MBA"], id: \.self) { Text($0).tag($0) }
                 }
-                TextField("입학 학기", text: $model.intake, prompt: Text("예: Fall 2027"))
+                TextField("입학 학기", text: $model.intake, prompt: Text(""))
             }
-            Section("지원자") {
-                TextField("지원자 영문 이름 (선택)", text: $model.applicantName, prompt: Text("여권 기준 영문 이름"))
-            }
+//            Section("지원자") {
+//                TextField("지원자 영문 이름 (선택)", text: $model.applicantName, prompt: Text("여권 기준 영문 이름"))
+//            }
         }
         .formStyle(.grouped)
         .padding(.horizontal, 12)
@@ -218,19 +218,19 @@ struct NewWorkspaceSheet: View {
                 .padding(14)
                 .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                HStack(alignment: .top, spacing: 11) {
-                    Image(systemName: model.isUpstageConnected ? "network.badge.shield.half.filled" : "lock.macwindow")
-                        .foregroundStyle(GCTheme.brand)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(model.providerLabel)
-                            .font(.system(size: 11, weight: .semibold))
-                        Text(model.isUpstageConnected
-                             ? "네 Upstage Studio 모집요강 Agent가 PDF를 Parse · Classify · Extract합니다."
-                             : "Agent를 실행하려면 up_로 시작하는 Upstage API 키를 입력해 주세요.")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                    }
-                }
+//                HStack(alignment: .top, spacing: 11) {
+//                    Image(systemName: model.isUpstageConnected ? "network.badge.shield.half.filled" : "lock.macwindow")
+//                        .foregroundStyle(GCTheme.brand)
+//                    VStack(alignment: .leading, spacing: 3) {
+//                        Text(model.providerLabel)
+//                            .font(.system(size: 11, weight: .semibold))
+//                        Text(model.isUpstageConnected
+//                             ? "Upstage Studio Document Agent가 PDF를 Parse · Classify · Extract합니다."
+//                             : "Agent를 실행하려면 up_로 시작하는 Upstage API 키를 입력해 주세요.")
+//                            .font(.system(size: 10))
+//                            .foregroundStyle(.secondary)
+//                    }
+//                }
             }
             .padding(28)
         }
@@ -353,7 +353,7 @@ struct NewWorkspaceSheet: View {
                         Text("모집요강 분석 중")
                     }
                 } else {
-                    Label("필요 서류 확인", systemImage: "sparkles")
+                    Text("필요 서류 확인")
                 }
             }
             .buttonStyle(.borderedProminent)

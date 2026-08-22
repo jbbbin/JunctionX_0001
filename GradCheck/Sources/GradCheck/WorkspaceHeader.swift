@@ -46,7 +46,7 @@ struct WorkspaceHeader: View {
             Button {
                 state.runAudit()
             } label: {
-                Label(state.isImporting ? "문서 분석 중" : "지원 패키지 검수", systemImage: state.isImporting ? "hourglass" : "sparkles")
+                Label(state.isImporting ? "문서 분석 중" : "지원 패키지 검수", systemImage: state.isImporting ? "hourglass" : "checkmark")
             }
             .buttonStyle(.borderedProminent)
             .tint(GCTheme.brand)
