@@ -1,21 +1,23 @@
 import AppKit
 import PDFKit
+import QuickLookUI
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
 
 enum SourcePreviewMode: String, CaseIterable, Identifiable {
     case web = "웹페이지"
-    case pdf = "PDF"
+    case document = "원문"
 
     var id: String { rawValue }
 }
 
 struct SourcePreviewView: View {
-    @StateObject private var browser = BrowserController()
-    @State private var selectedPDFURL: URL?
-    @State private var isShowingPDFImporter = false
-    @State private var isPDFTabVisible = true
+    @StateObject private var browser = WebBrowserViewModel()
+    @State private var isShowingDocumentImporter = false
+    @State private var isDocumentTabVisible = true
+    @State private var addressDraft = ""
+    @FocusState private var isAddressFieldFocused: Bool
 
     @Binding var mode: SourcePreviewMode
     @Binding var evidenceTitle: String?
@@ -23,6 +25,24 @@ struct SourcePreviewView: View {
 
     let applicationURL: URL?
     let sourceFilename: String
+    @Binding var selectedDocumentURL: URL?
+
+    init(
+        applicationURL: URL?,
+        sourceFilename: String,
+        mode: Binding<SourcePreviewMode>,
+        evidenceTitle: Binding<String?>,
+        requestedPDFPage: Binding<Int>,
+        selectedDocumentURL: Binding<URL?>
+    ) {
+        self.applicationURL = applicationURL
+        self.sourceFilename = sourceFilename
+        _mode = mode
+        _evidenceTitle = evidenceTitle
+        _requestedPDFPage = requestedPDFPage
+        _selectedDocumentURL = selectedDocumentURL
+        _isDocumentTabVisible = State(initialValue: selectedDocumentURL.wrappedValue != nil)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,21 +55,48 @@ struct SourcePreviewView: View {
                 Divider()
                 webContent
             } else {
-                pdfToolbar
+                documentToolbar
                 Divider()
-                pdfContent
+                documentContent
             }
         }
         .background(Color.awCanvas)
         .fileImporter(
-            isPresented: $isShowingPDFImporter,
-            allowedContentTypes: [.pdf],
+            isPresented: $isShowingDocumentImporter,
+            allowedContentTypes: supportedSourceTypes,
             allowsMultipleSelection: false
         ) { result in
             guard case let .success(urls) = result, let url = urls.first else { return }
-            selectedPDFURL = url
-            mode = .pdf
+            selectedDocumentURL = url
+            mode = .document
         }
+        .onAppear {
+            if addressDraft.isEmpty {
+                addressDraft = browser.currentAddress.isEmpty
+                    ? (applicationURL?.absoluteString ?? "")
+                    : browser.currentAddress
+            }
+        }
+        .onChange(of: browser.currentAddress) { _, newAddress in
+            if !isAddressFieldFocused {
+                addressDraft = newAddress
+            }
+        }
+        .onChange(of: mode) { _, newMode in
+            if newMode == .document {
+                isDocumentTabVisible = true
+            }
+        }
+        .onChange(of: evidenceTitle) { _, newTitle in
+            if newTitle != nil, mode == .web {
+                browser.loadSourceIfNeeded(applicationURL, force: true)
+            }
+        }
+    }
+
+    private var supportedSourceTypes: [UTType] {
+        [.pdf, .image] + ["docx", "pptx", "xlsx", "hwp", "hwpx"]
+            .compactMap { UTType(filenameExtension: $0) }
     }
 
     private var obsidianTabBar: some View {
@@ -61,10 +108,10 @@ struct SourcePreviewView: View {
                 canClose: false
             )
 
-            if isPDFTabVisible {
+            if isDocumentTabVisible {
                 sourceTab(
-                    .pdf,
-                    title: selectedPDFURL?.lastPathComponent ?? sourceFilename,
+                    .document,
+                    title: selectedDocumentURL?.lastPathComponent ?? sourceFilename,
                     icon: "doc.text",
                     canClose: true
                 )
@@ -73,9 +120,11 @@ struct SourcePreviewView: View {
             Spacer(minLength: 8)
 
             Button {
-                isPDFTabVisible = true
-                mode = .pdf
-                isShowingPDFImporter = true
+                isDocumentTabVisible = true
+                mode = .document
+                if selectedDocumentURL == nil {
+                    isShowingDocumentImporter = true
+                }
             } label: {
                 Image(systemName: "plus")
                     .font(.caption.weight(.semibold))
@@ -83,7 +132,7 @@ struct SourcePreviewView: View {
             }
             .buttonStyle(.plain)
             .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 6))
-            .help("새 PDF 탭")
+            .help("새 원문 탭")
             .padding(.bottom, 4)
         }
         .padding(.horizontal, 8)
@@ -127,8 +176,7 @@ struct SourcePreviewView: View {
 
             if canClose {
                 Button {
-                    isPDFTabVisible = false
-                    selectedPDFURL = nil
+                    isDocumentTabVisible = false
                     mode = .web
                 } label: {
                     Image(systemName: "xmark")
@@ -164,13 +212,13 @@ struct SourcePreviewView: View {
         HStack(spacing: 14) {
             HStack(spacing: 7) {
                 Circle()
-                    .fill(Color.awAccent)
+                    .fill(isCurrentSourceConnected ? Color.awAccent : Color.secondary.opacity(0.55))
                     .frame(width: 7, height: 7)
-                Text(mode == .web ? "공고 웹 · 원문 연결됨" : "공고 PDF · 원문 연결됨")
+                Text(sourceConnectionLabel)
                     .font(.caption.weight(.bold))
             }
 
-            Text("마지막 분석 14:02")
+            Text("분석 결과 연결됨")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
@@ -180,10 +228,10 @@ struct SourcePreviewView: View {
                 if mode == .web {
                     browser.reload()
                 } else {
-                    isShowingPDFImporter = true
+                    isShowingDocumentImporter = true
                 }
             } label: {
-                Label(mode == .web ? "다시 가져오기" : "PDF 변경", systemImage: "arrow.clockwise")
+                Label(mode == .web ? "새로고침" : "원문 변경", systemImage: "arrow.clockwise")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -194,7 +242,38 @@ struct SourcePreviewView: View {
     }
 
     private var webTabTitle: String {
-        applicationURL?.host() ?? "웹 공고"
+        browser.currentURL?.host() ?? applicationURL?.host() ?? "웹 공고"
+    }
+
+    private var isCurrentSourceConnected: Bool {
+        switch mode {
+        case .web:
+            browser.currentURL != nil || applicationURL != nil
+        case .document:
+            selectedDocumentURL != nil
+        }
+    }
+
+    private var sourceConnectionLabel: String {
+        switch (mode, isCurrentSourceConnected) {
+        case (.web, true): "공고 웹 · 원문 연결됨"
+        case (.web, false): "공고 웹 · 주소 입력 필요"
+        case (.document, true):
+            switch selectedDocumentKind {
+            case .pdf: "공고 PDF · 원문 연결됨"
+            case .image: "공고 이미지 · 원문 연결됨"
+            case .quickLook: "공고 문서 · 원문 연결됨"
+            case .unsupported: "공고 원문 · 미리보기 제한"
+            }
+        case (.document, false): "공고 원문 · 파일 선택 필요"
+        }
+    }
+
+    private var browserStatusColor: Color {
+        if browser.errorMessage != nil { return .red }
+        if browser.isLoading { return .orange }
+        if browser.currentURL != nil || applicationURL != nil { return .green }
+        return .secondary.opacity(0.55)
     }
 
     private var webToolbar: some View {
@@ -221,14 +300,39 @@ struct SourcePreviewView: View {
 
             HStack(spacing: 9) {
                 Circle()
-                    .fill(browser.isLoading ? Color.orange : Color.green)
+                    .fill(browserStatusColor)
                     .frame(width: 7, height: 7)
-                Text(browser.currentAddress.isEmpty ? (applicationURL?.absoluteString ?? "연결할 웹 주소가 없습니다") : browser.currentAddress)
+
+                TextField(
+                    "URL 또는 검색어 입력",
+                    text: $addressDraft
+                )
+                    .textFieldStyle(.plain)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .textSelection(.enabled)
+                    .focused($isAddressFieldFocused)
+                    .onChange(of: isAddressFieldFocused) { _, isFocused in
+                        if !isFocused {
+                            addressDraft = browser.currentAddress
+                        }
+                    }
+                    .onSubmit {
+                        browser.navigateFromAddressBar(addressDraft)
+                        isAddressFieldFocused = false
+                    }
+
                 Spacer(minLength: 0)
+
+                if isAddressFieldFocused || addressDraft != browser.currentAddress {
+                    Button {
+                        browser.navigateFromAddressBar(addressDraft)
+                        isAddressFieldFocused = false
+                    } label: {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .foregroundStyle(Color.awAccent)
+                    }
+                    .buttonStyle(.plain)
+                    .help("이 주소로 이동")
+                }
             }
             .padding(.horizontal, 13)
             .frame(height: 32)
@@ -254,44 +358,96 @@ struct SourcePreviewView: View {
 
     @ViewBuilder
     private var webContent: some View {
-        if let applicationURL {
-            ZStack(alignment: .bottom) {
-                WebKitContainer(controller: browser, url: applicationURL)
-                    .background(Color.white)
-                evidenceBar
+        ZStack(alignment: .bottom) {
+            WebKitContainer(viewModel: browser, sourceURL: applicationURL)
+                .background(Color.white)
+
+            if let errorMessage = browser.errorMessage {
+                browserError(errorMessage)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if applicationURL == nil, browser.currentURL == nil, !browser.isLoading {
+                browserStartHint
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        } else {
-            EmptyPlaceholder(
-                icon: "network.slash",
-                title: "연결된 웹 공고가 없어요",
-                message: "PDF 탭에서 모집요강을 선택해 원문을 확인할 수 있습니다."
-            )
+
+            evidenceBar
         }
     }
 
-    private var pdfToolbar: some View {
+    private var browserStartHint: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "globe.desk")
+                .font(.system(size: 38))
+                .foregroundStyle(Color.awAccent)
+            Text("웹 공고를 찾아보세요")
+                .font(.headline)
+            Text("위 주소창에 URL이나 검색어를 입력하면 이 탭에서 바로 탐색할 수 있어요.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 360)
+        }
+        .padding(28)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .fixedSize()
+    }
+
+    private func browserError(_ message: String) -> some View {
+        VStack(spacing: 13) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 34))
+                .foregroundStyle(.orange)
+            Text("페이지를 불러오지 못했어요")
+                .font(.headline)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 380)
+            Button {
+                retryBrowserNavigation()
+            } label: {
+                Label("다시 시도", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+        }
+        .padding(28)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .fixedSize()
+    }
+
+    private func retryBrowserNavigation() {
+        let input = addressDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if input.isEmpty {
+            browser.reload()
+        } else {
+            browser.navigateFromAddressBar(input)
+        }
+    }
+
+    private var documentToolbar: some View {
         HStack(spacing: 12) {
             Image(systemName: "doc.richtext")
                 .foregroundStyle(Color.awAccent)
             VStack(alignment: .leading, spacing: 1) {
-                Text(selectedPDFURL?.lastPathComponent ?? sourceFilename)
+                Text(selectedDocumentURL?.lastPathComponent ?? sourceFilename)
                     .font(.caption.weight(.semibold))
                     .lineLimit(1)
-                Text(selectedPDFURL == nil ? "원본 PDF를 선택해 주세요" : "\(requestedPDFPage)페이지 근거 표시")
+                Text(documentStatusText)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if let selectedPDFURL {
+            if let selectedDocumentURL {
                 Button {
-                    NSWorkspace.shared.open(selectedPDFURL)
+                    NSWorkspace.shared.open(selectedDocumentURL)
                 } label: {
                     Label("별도 창에서 열기", systemImage: "arrow.up.right.square")
                 }
                 .buttonStyle(.borderless)
             }
-            Button("PDF 선택") {
-                isShowingPDFImporter = true
+            Button("원문 선택") {
+                isShowingDocumentImporter = true
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -302,10 +458,40 @@ struct SourcePreviewView: View {
     }
 
     @ViewBuilder
-    private var pdfContent: some View {
-        if let selectedPDFURL {
+    private var documentContent: some View {
+        if let selectedDocumentURL {
             ZStack(alignment: .bottom) {
-                PDFKitContainer(url: selectedPDFURL, page: requestedPDFPage)
+                switch selectedDocumentKind {
+                case .pdf:
+                    PDFKitContainer(url: selectedDocumentURL, page: requestedPDFPage)
+                case .image:
+                    if let image = loadPreviewImage(at: selectedDocumentURL) {
+                        ScrollView([.horizontal, .vertical]) {
+                            Image(nsImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .padding(28)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        .background(Color(nsColor: .underPageBackgroundColor))
+                    } else {
+                        documentPreviewUnavailable(
+                            url: selectedDocumentURL,
+                            title: "이미지를 미리 볼 수 없어요",
+                            message: "파일이 손상되었거나 macOS에서 지원하지 않는 이미지 형식일 수 있어요.",
+                            icon: "photo.badge.exclamationmark"
+                        )
+                    }
+                case .quickLook:
+                    QuickLookContainer(url: selectedDocumentURL)
+                case .unsupported:
+                    documentPreviewUnavailable(
+                        url: selectedDocumentURL,
+                        title: "이 형식은 미리보기를 지원하지 않아요",
+                        message: "PDF, 이미지, DOCX, PPTX, XLSX, HWP 또는 HWPX 원문을 선택해 주세요.",
+                        icon: "doc.badge.ellipsis"
+                    )
+                }
                 evidenceBar
             }
         } else {
@@ -313,23 +499,93 @@ struct SourcePreviewView: View {
                 Image(systemName: "doc.text.magnifyingglass")
                     .font(.system(size: 48))
                     .foregroundStyle(Color.awAccent)
-                Text("모집요강 PDF를 연결하세요")
+                Text("모집요강 원문을 연결하세요")
                     .font(.title3.weight(.bold))
-                Text("선택한 PDF를 이 패널에서 바로 읽고, 왼쪽의 원문 근거 버튼으로 해당 페이지를 이동할 수 있어요.")
+                Text("선택한 PDF, 이미지, Office 또는 HWP 문서를 이 패널에서 바로 읽고, 왼쪽 항목과 함께 원문 근거를 확인할 수 있어요.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 430)
                 Button {
-                    isShowingPDFImporter = true
+                    isShowingDocumentImporter = true
                 } label: {
-                    Label("PDF 선택", systemImage: "folder")
+                    Label("원문 선택", systemImage: "folder")
                 }
                 .buttonStyle(PrimaryButtonStyle())
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.awCanvas)
         }
+    }
+
+    private var selectedDocumentKind: DocumentPreviewKind {
+        guard let fileExtension = selectedDocumentURL?.pathExtension.lowercased() else {
+            return .unsupported
+        }
+
+        switch fileExtension {
+        case "pdf":
+            return .pdf
+        case "png", "jpg", "jpeg", "heic", "tif", "tiff", "gif", "bmp", "webp":
+            return .image
+        case "docx", "pptx", "xlsx", "hwp", "hwpx":
+            return .quickLook
+        default:
+            return .unsupported
+        }
+    }
+
+    private var documentStatusText: String {
+        guard selectedDocumentURL != nil else {
+            return "PDF, 이미지, Office 또는 HWP 원문을 선택해 주세요"
+        }
+
+        return switch selectedDocumentKind {
+        case .pdf: "\(requestedPDFPage)페이지 근거 표시"
+        case .image: "이미지 원문 표시"
+        case .quickLook: "macOS Quick Look으로 문서 표시"
+        case .unsupported: "미리보기를 지원하지 않는 파일 형식"
+        }
+    }
+
+    private func loadPreviewImage(at url: URL) -> NSImage? {
+        let isAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if isAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return NSImage(data: data)
+    }
+
+    private func documentPreviewUnavailable(
+        url: URL,
+        title: String,
+        message: String,
+        icon: String
+    ) -> some View {
+        VStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 42))
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.headline)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+            Button {
+                NSWorkspace.shared.open(url)
+            } label: {
+                Label("별도 창에서 열기", systemImage: "arrow.up.right.square")
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.awCanvas)
     }
 
     @ViewBuilder
@@ -365,94 +621,24 @@ struct SourcePreviewView: View {
     }
 }
 
-@MainActor
-private final class BrowserController: NSObject, ObservableObject, WKNavigationDelegate {
-    @Published var canGoBack = false
-    @Published var canGoForward = false
-    @Published var isLoading = false
-    @Published var currentAddress = ""
-    @Published var currentURL: URL?
-
-    let webView: WKWebView
-    private var requestedURL: URL?
-
-    override init() {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .default()
-        webView = WKWebView(frame: .zero, configuration: configuration)
-        super.init()
-        webView.navigationDelegate = self
-        webView.allowsMagnification = true
-    }
-
-    func loadIfNeeded(_ url: URL) {
-        guard requestedURL != url else { return }
-        requestedURL = url
-        webView.load(URLRequest(url: url))
-    }
-
-    func goBack() {
-        guard webView.canGoBack else { return }
-        webView.goBack()
-    }
-
-    func goForward() {
-        guard webView.canGoForward else { return }
-        webView.goForward()
-    }
-
-    func reload() {
-        if webView.url != nil {
-            webView.reload()
-        } else if let requestedURL {
-            webView.load(URLRequest(url: requestedURL))
-        }
-    }
-
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        updateState(from: webView, loading: true)
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        updateState(from: webView, loading: false)
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        didFail navigation: WKNavigation!,
-        withError error: Error
-    ) {
-        updateState(from: webView, loading: false)
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        didFailProvisionalNavigation navigation: WKNavigation!,
-        withError error: Error
-    ) {
-        updateState(from: webView, loading: false)
-    }
-
-    private func updateState(from webView: WKWebView, loading: Bool) {
-        canGoBack = webView.canGoBack
-        canGoForward = webView.canGoForward
-        isLoading = loading
-        currentURL = webView.url
-        currentAddress = webView.url?.absoluteString ?? requestedURL?.absoluteString ?? ""
-    }
+private enum DocumentPreviewKind {
+    case pdf
+    case image
+    case quickLook
+    case unsupported
 }
 
 private struct WebKitContainer: NSViewRepresentable {
-    @ObservedObject var controller: BrowserController
-    let url: URL
+    @ObservedObject var viewModel: WebBrowserViewModel
+    let sourceURL: URL?
 
     func makeNSView(context: Context) -> WKWebView {
-        controller.loadIfNeeded(url)
-        return controller.webView
+        viewModel.loadSourceIfNeeded(sourceURL)
+        return viewModel.webView
     }
 
     func updateNSView(_ nsView: WKWebView, context: Context) {
-        controller.loadIfNeeded(url)
+        viewModel.loadSourceIfNeeded(sourceURL)
     }
 }
 
@@ -479,10 +665,16 @@ private struct PDFKitContainer: NSViewRepresentable {
         load(url: url, page: page, into: nsView, coordinator: context.coordinator)
     }
 
+    static func dismantleNSView(_ nsView: PDFView, coordinator: Coordinator) {
+        coordinator.stopAccessingResource()
+        nsView.document = nil
+    }
+
     private func load(url: URL, page: Int, into view: PDFView, coordinator: Coordinator) {
         if coordinator.loadedURL != url {
+            coordinator.startAccessingResource(at: url)
             view.document = PDFDocument(url: url)
-            coordinator.loadedURL = url
+            coordinator.page = 0
         }
 
         guard let document = view.document,
@@ -496,7 +688,72 @@ private struct PDFKitContainer: NSViewRepresentable {
     }
 
     final class Coordinator {
-        var loadedURL: URL?
+        private(set) var loadedURL: URL?
         var page = 0
+        private var isAccessingSecurityScopedResource = false
+
+        func startAccessingResource(at url: URL) {
+            stopAccessingResource()
+            loadedURL = url
+            isAccessingSecurityScopedResource = url.startAccessingSecurityScopedResource()
+        }
+
+        func stopAccessingResource() {
+            if isAccessingSecurityScopedResource, let loadedURL {
+                loadedURL.stopAccessingSecurityScopedResource()
+            }
+            isAccessingSecurityScopedResource = false
+            loadedURL = nil
+        }
+    }
+}
+
+private struct QuickLookContainer: NSViewRepresentable {
+    let url: URL
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> QLPreviewView {
+        let view = QLPreviewView(frame: .zero, style: .normal) ?? QLPreviewView(frame: .zero)!
+        view.shouldCloseWithWindow = false
+        update(view, with: url, coordinator: context.coordinator)
+        return view
+    }
+
+    func updateNSView(_ nsView: QLPreviewView, context: Context) {
+        update(nsView, with: url, coordinator: context.coordinator)
+    }
+
+    static func dismantleNSView(_ nsView: QLPreviewView, coordinator: Coordinator) {
+        coordinator.stopAccessingResource()
+        nsView.close()
+    }
+
+    private func update(_ view: QLPreviewView, with url: URL, coordinator: Coordinator) {
+        guard coordinator.loadedURL != url else { return }
+        coordinator.startAccessingResource(at: url)
+        view.previewItem = url as NSURL
+        view.refreshPreviewItem()
+    }
+
+    final class Coordinator {
+        private(set) var loadedURL: URL?
+        private var isAccessingSecurityScopedResource = false
+
+        func startAccessingResource(at url: URL) {
+            stopAccessingResource()
+            loadedURL = url
+            isAccessingSecurityScopedResource = url.startAccessingSecurityScopedResource()
+        }
+
+        func stopAccessingResource() {
+            if isAccessingSecurityScopedResource, let loadedURL {
+                loadedURL.stopAccessingSecurityScopedResource()
+            }
+            isAccessingSecurityScopedResource = false
+            loadedURL = nil
+        }
     }
 }

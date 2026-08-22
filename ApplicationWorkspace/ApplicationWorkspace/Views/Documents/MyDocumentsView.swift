@@ -1,13 +1,8 @@
-import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct MyDocumentsView: View {
-    @EnvironmentObject private var store: AppStore
-    @State private var isShowingImporter = false
-    @State private var replacementDocumentID: UUID?
-    @State private var documentToDelete: OwnedDocument?
-    @State private var previewDocument: OwnedDocument?
+    @ObservedObject var viewModel: DocumentsViewModel
 
     var body: some View {
         ScrollView {
@@ -21,44 +16,40 @@ struct MyDocumentsView: View {
         }
         .navigationTitle("내 문서함")
         .fileImporter(
-            isPresented: $isShowingImporter,
+            isPresented: $viewModel.isShowingImporter,
             allowedContentTypes: [.pdf],
             allowsMultipleSelection: false
-        ) { result in
-            guard case let .success(urls) = result, let url = urls.first else {
-                replacementDocumentID = nil
-                return
-            }
-
-            if let replacementDocumentID {
-                store.replaceOwnedDocument(id: replacementDocumentID, with: url)
-            } else {
-                store.addOwnedDocument(from: url)
-            }
-            self.replacementDocumentID = nil
-        }
+        ) { viewModel.handleImport($0) }
         .confirmationDialog(
             "이 문서를 삭제할까요?",
             isPresented: Binding(
-                get: { documentToDelete != nil },
-                set: { if !$0 { documentToDelete = nil } }
+                get: { viewModel.documentToDelete != nil },
+                set: { if !$0 { viewModel.documentToDelete = nil } }
             ),
             titleVisibility: .visible
         ) {
             Button("문서 삭제", role: .destructive) {
-                if let documentToDelete {
-                    store.deleteOwnedDocument(id: documentToDelete.id)
-                }
-                documentToDelete = nil
+                viewModel.confirmDelete()
             }
             Button("취소", role: .cancel) {
-                documentToDelete = nil
+                viewModel.documentToDelete = nil
             }
         } message: {
             Text("다른 지원에서 자동 매칭된 연결도 영향을 받을 수 있어요.")
         }
-        .sheet(item: $previewDocument) { document in
+        .sheet(item: $viewModel.previewDocument) { document in
             DocumentPreviewSheet(document: document)
+        }
+        .alert(
+            "문서를 불러오지 못했어요",
+            isPresented: Binding(
+                get: { viewModel.message != nil },
+                set: { if !$0 { viewModel.message = nil } }
+            )
+        ) {
+            Button("확인") { viewModel.message = nil }
+        } message: {
+            Text(viewModel.message ?? "")
         }
     }
 
@@ -73,8 +64,7 @@ struct MyDocumentsView: View {
             }
             Spacer()
             Button {
-                replacementDocumentID = nil
-                isShowingImporter = true
+                viewModel.beginAdding()
             } label: {
                 Label("문서 추가", systemImage: "plus")
             }
@@ -95,7 +85,7 @@ struct MyDocumentsView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            StatusPill("\(store.ownedDocuments.count)개 보유", icon: "doc.on.doc.fill", tint: .green)
+            StatusPill("\(viewModel.documents.count)개 보유", icon: "doc.on.doc.fill", tint: .green)
         }
         .padding(17)
         .background(Color.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
@@ -114,7 +104,7 @@ struct MyDocumentsView: View {
                 }
                 .padding(.bottom, 14)
 
-                if store.ownedDocuments.isEmpty {
+                if viewModel.documents.isEmpty {
                     EmptyPlaceholder(
                         icon: "folder.badge.plus",
                         title: "등록한 문서가 없어요",
@@ -122,9 +112,9 @@ struct MyDocumentsView: View {
                     )
                     .frame(height: 260)
                 } else {
-                    ForEach(store.ownedDocuments) { document in
+                    ForEach(viewModel.documents) { document in
                         documentRow(document)
-                        if document.id != store.ownedDocuments.last?.id {
+                        if document.id != viewModel.documents.last?.id {
                             Divider()
                                 .padding(.leading, 54)
                         }
@@ -161,23 +151,18 @@ struct MyDocumentsView: View {
                 .foregroundStyle(.secondary)
 
             Button("열기") {
-                if let url = document.fileURL {
-                    NSWorkspace.shared.open(url)
-                } else {
-                    previewDocument = document
-                }
+                viewModel.open(document)
             }
             .buttonStyle(.borderless)
 
             Menu {
                 Button {
-                    replacementDocumentID = document.id
-                    isShowingImporter = true
+                    viewModel.beginReplacing(document)
                 } label: {
                     Label("최신 파일로 교체", systemImage: "arrow.triangle.2.circlepath")
                 }
                 Button(role: .destructive) {
-                    documentToDelete = document
+                    viewModel.documentToDelete = document
                 } label: {
                     Label("삭제", systemImage: "trash")
                 }

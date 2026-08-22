@@ -101,8 +101,10 @@ MVP가 제공해야 하는 핵심 경험은 다음과 같다.
 
 ### 5.1 모집요강 등록
 
-사용자가 PDF 모집요강을 선택해 서비스에 등록한다. 이미지 공고 업로드와
-드래그 앤 드롭은 P1 기능으로 다룬다.
+사용자가 PDF·이미지·DOCX·PPTX·XLSX·HWP·HWPX 모집요강 또는 공식 공고 URL
+하나를 서비스에 등록한다. 드래그 앤 드롭은 파일 입력의 보조 수단으로 제공한다.
+공개 JavaScript 공고는 비영구 WebKit으로 렌더링하며, 로그인·인증·브라우저
+세션이 필요한 페이지는 PDF로 저장해 등록하도록 안내한다.
 
 ### 5.2 문서 자동 분석
 
@@ -164,8 +166,8 @@ MVP는 별도의 전통적인 서버를 운영하지 않고 **Firebase 기반의
 Upstage Studio**를 조합한다.
 
 ```text
-iOS App
-  │ PDF 업로드
+macOS App
+  │ PDF·이미지·DOCX·PPTX·XLSX·HWP·HWPX 업로드 또는 공고 URL 등록
   ▼
 Firebase Storage
   │ 분석 요청
@@ -191,6 +193,11 @@ Dashboard · Application Workspace
   실시간으로 전달한다.
 - **Secret Manager:** Upstage API 키를 앱과 저장소에 노출하지 않고 함수에만
   제공한다.
+
+서버 이전 전 로컬 검증 빌드는 `ApplicationAnalyzing` 뒤의
+`LocalUpstageApplicationAnalysisService`를 사용한다. 이때 개발자 개인 API 키는
+macOS Keychain 또는 `UPSTAGE_API_KEY` 실행 환경 변수로만 주입하며, 사용자에게
+배포할 팀 공용 키는 앱에 포함하지 않는다.
 - **Security Rules:** 사용자별 문서와 데이터 접근을 제한하고 파일 형식 및
   크기를 검증한다.
 
@@ -205,7 +212,7 @@ Firebase는 서버를 직접 운영하지 않으면서 업로드, 분석 상태�
 - 공통 정보와 분야별 필드를 구조화된 결과로 추출한다.
 - 마감일, 자격 요건, 필수 서류와 원문 근거를 반환한다.
 
-### iOS Application Workspace
+### macOS Application Workspace
 
 - Firebase Storage에 문서를 한 번 업로드한다.
 - Firestore의 `uploaded → analyzing → completed | failed` 상태를 구독한다.
@@ -215,13 +222,13 @@ Firebase는 서버를 직접 운영하지 않으면서 업로드, 분석 상태�
 - D-Day, 지원 가능 상태, 준비율, 남은 작업과 다음 행동을 한 화면에 표시한다.
 
 즉, Firebase가 문서와 처리 상태를 안전하게 연결하고, Upstage Studio가 문서를
-이해하며, iOS 앱이 그 결과를 사용자의 행동으로 변환한다.
+이해하며, macOS 앱이 그 결과를 사용자의 행동으로 변환한다.
 
 ## 7. MVP 범위
 
 ### 포함
 
-- [ ] PDF 모집요강 업로드
+- [ ] PDF·이미지·DOCX·PPTX·XLSX·HWP·HWPX 모집요강 및 공고 URL 등록
 - [ ] Firebase Authentication 기반 사용자 구분
 - [ ] Firebase Storage 기반 모집요강·보유 문서 업로드
 - [ ] Cloud Functions 기반 Upstage Studio 호출
@@ -243,7 +250,7 @@ Firebase는 서버를 직접 운영하지 않으면서 업로드, 분석 상태�
 ### 제외
 
 - 자체 캘린더
-- 자체 인앱 웹 브라우저
+- 다중 탭·북마크·다운로드 관리까지 제공하는 범용 웹 브라우저
 - 완전한 자기소개서 편집기
 - 개인·단체 프로필 모드 전환
 - 공고 추천
@@ -252,8 +259,9 @@ Firebase는 서버를 직접 운영하지 않으면서 업로드, 분석 상태�
 - 협업 및 지원 통계 화면
 - 별도로 운영하는 전통적인 백엔드 서버
 
-필요한 경우 캘린더, 웹 브라우저와 편집 기능은 기존 시스템 또는 외부
-서비스로 연결한다.
+Workspace 오른쪽의 Source Preview는 판정 근거 확인에 필요한 PDF·웹 탐색만
+제공한다. 범용 브라우징, 최종 인증과 제출은 공식 접수처 또는 시스템
+브라우저에서 수행하고, 편집 기능은 기존 시스템 또는 외부 서비스로 연결한다.
 
 ## 8. Workspace 예시
 

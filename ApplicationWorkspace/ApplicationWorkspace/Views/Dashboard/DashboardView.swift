@@ -2,13 +2,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct DashboardView: View {
-    @EnvironmentObject private var store: AppStore
-    @Binding var searchText: String
+    @ObservedObject var viewModel: DashboardViewModel
     @State private var isShowingImporter = false
     @State private var isDropTargeted = false
 
-    let statusFilter: DashboardStatusFilter
     let onImport: (URL) -> Void
+    let onAddURL: () -> Void
+    let onOpenApplication: (UUID) -> Void
     let onShowAll: () -> Void
 
     var body: some View {
@@ -28,7 +28,7 @@ struct DashboardView: View {
         .background(Color.awCanvas)
         .fileImporter(
             isPresented: $isShowingImporter,
-            allowedContentTypes: [.pdf, .image],
+            allowedContentTypes: supportedSourceTypes,
             allowsMultipleSelection: false
         ) { result in
             guard case let .success(urls) = result, let url = urls.first else { return }
@@ -36,10 +36,15 @@ struct DashboardView: View {
         }
     }
 
+    private var supportedSourceTypes: [UTType] {
+        [.pdf, .image] + ["docx", "pptx", "xlsx", "hwp", "hwpx"]
+            .compactMap { UTType(filenameExtension: $0) }
+    }
+
     private var greeting: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 7) {
-                Text("안녕하세요, 홍길동님")
+                Text("안녕하세요, \(viewModel.userName)님")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
                 Text("이번 주, 놓치지 말아야 할 지원")
@@ -51,7 +56,7 @@ struct DashboardView: View {
 
             Spacer()
 
-            Text("B")
+            Text(viewModel.avatarInitial)
                 .font(.title2.weight(.medium))
                 .foregroundStyle(.white)
                 .frame(width: 54, height: 54)
@@ -63,9 +68,9 @@ struct DashboardView: View {
 
     private var overview: some View {
         HStack(spacing: 18) {
-            if let nearestApplication {
+            if let nearestApplication = viewModel.nearestApplication {
                 Button {
-                    store.route = .application(nearestApplication.id)
+                    onOpenApplication(nearestApplication.id)
                 } label: {
                     HStack(spacing: 22) {
                         VStack(alignment: .leading, spacing: 9) {
@@ -76,7 +81,7 @@ struct DashboardView: View {
                                 .font(.system(size: 23, weight: .bold))
                                 .foregroundStyle(.white)
                                 .lineLimit(1)
-                            Text("\(formattedDeadline(nearestApplication.deadline)) · \(nearestApplication.dDayText)")
+                            Text("\(viewModel.formattedDeadline(nearestApplication.deadline)) · \(nearestApplication.dDayText)")
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(.white.opacity(0.90))
                         }
@@ -105,13 +110,13 @@ struct DashboardView: View {
 
             VStack(spacing: 12) {
                 summaryCard(
-                    count: eligibleCount,
+                    count: viewModel.eligibleCount,
                     title: "지원 가능",
                     subtitle: "바로 준비를 시작할 수 있어요",
                     tint: .awAccent
                 )
                 summaryCard(
-                    count: reviewCount,
+                    count: viewModel.reviewCount,
                     title: "조건 확인 필요",
                     subtitle: "원문 근거를 한 번 더 보세요",
                     tint: .orange
@@ -157,7 +162,7 @@ struct DashboardView: View {
                 Text("공고를 추가하세요")
                     .font(.system(size: 21, weight: .bold))
                 Spacer()
-                Text("PDF · 이미지 · 공고 URL")
+                Text("PDF · 이미지 · Office · HWP · 공고 URL")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -172,11 +177,17 @@ struct DashboardView: View {
                 Text("또는 파일을 선택하세요")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("파일 선택") {
-                    isShowingImporter = true
+                HStack(spacing: 8) {
+                    Button("파일 선택") {
+                        isShowingImporter = true
+                    }
+                    .font(.caption.weight(.bold))
+                    .buttonStyle(SecondaryButtonStyle())
+
+                    Button("공고 URL 입력", action: onAddURL)
+                        .font(.caption.weight(.bold))
+                        .buttonStyle(SecondaryButtonStyle())
                 }
-                .font(.caption.weight(.bold))
-                .buttonStyle(SecondaryButtonStyle())
             }
             .frame(maxWidth: .infinity, minHeight: 150)
             .background(
@@ -191,7 +202,7 @@ struct DashboardView: View {
                     )
             )
             .dropDestination(for: URL.self) { urls, _ in
-                guard let url = urls.first, isSupportedImport(url) else { return false }
+                guard let url = urls.first, viewModel.isSupportedImport(url) else { return false }
                 onImport(url)
                 return true
             } isTargeted: { targeted in
@@ -205,31 +216,39 @@ struct DashboardView: View {
     private var applicationsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(sectionTitle)
+                Text(viewModel.sectionTitle)
                     .font(.system(size: 21, weight: .bold))
                 Spacer()
-                Button("전체 보기  ›", action: onShowAll)
-                    .font(.subheadline.weight(.bold))
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.awAccent)
+                if !viewModel.showsAllApplications {
+                    Button("전체 보기  ›", action: onShowAll)
+                        .font(.subheadline.weight(.bold))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.awAccent)
+                }
             }
 
-            if displayedApplications.isEmpty {
+            if viewModel.filteredApplications.isEmpty {
                 SectionCard {
-                    EmptyPlaceholder(
-                        icon: "tray",
-                        title: "조건에 맞는 지원이 없어요",
-                        message: "검색어를 지우거나 다른 Smart View를 선택해 보세요."
-                    )
-                    .frame(height: 180)
+                    VStack(spacing: 12) {
+                        EmptyPlaceholder(
+                            icon: "tray",
+                            title: "조건에 맞는 지원이 없어요",
+                            message: "검색어를 지우거나 다른 Smart View를 선택해 보세요."
+                        )
+                        if !viewModel.searchText.isEmpty {
+                            Button("검색 초기화", action: viewModel.clearSearch)
+                                .buttonStyle(SecondaryButtonStyle())
+                        }
+                    }
+                    .frame(height: 190)
                 }
             } else {
                 VStack(spacing: 0) {
                     tableHeader
                     Divider().padding(.horizontal, 18)
-                    ForEach(Array(displayedApplications.prefix(4).enumerated()), id: \.element.id) { index, application in
+                    ForEach(Array(viewModel.visibleApplications.enumerated()), id: \.element.id) { index, application in
                         applicationRow(application, isHighlighted: index == 0)
-                        if application.id != displayedApplications.prefix(4).last?.id {
+                        if application.id != viewModel.visibleApplications.last?.id {
                             Divider().padding(.horizontal, 18)
                         }
                     }
@@ -265,7 +284,7 @@ struct DashboardView: View {
 
     private func applicationRow(_ application: ApplicationItem, isHighlighted: Bool) -> some View {
         Button {
-            store.route = .application(application.id)
+            onOpenApplication(application.id)
         } label: {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -280,13 +299,13 @@ struct DashboardView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text(formattedShortDate(application.deadline))
+                Text(viewModel.formattedShortDate(application.deadline))
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.primary)
                     .frame(width: 94, alignment: .leading)
 
                 StatusPill(
-                    compactEligibility(application.eligibility),
+                    viewModel.compactEligibility(application.eligibility),
                     tint: application.eligibility.tint
                 )
                 .frame(width: 112, alignment: .leading)
@@ -296,7 +315,7 @@ struct DashboardView: View {
                     .foregroundStyle(application.progress >= 1 ? .green : Color(red: 0.10, green: 0.56, blue: 0.26))
                     .frame(width: 124, alignment: .leading)
 
-                Text(application.progress >= 1 ? "패키지 생성  ›" : "준비 계속  ›")
+                Text(rowActionTitle(for: application))
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(Color.awAccent)
                     .frame(width: 142, alignment: .leading)
@@ -312,78 +331,9 @@ struct DashboardView: View {
         .buttonStyle(.plain)
     }
 
-    private var nearestApplication: ApplicationItem? {
-        store.applications
-            .filter { !$0.isCompleted && $0.daysRemaining >= 0 }
-            .min { $0.deadline < $1.deadline }
+    private func rowActionTitle(for application: ApplicationItem) -> String {
+        guard application.isReadyToSubmit else { return "준비 계속  ›" }
+        return application.applicationURL == nil ? "접수 URL 확인  ›" : "접수처 열기  ›"
     }
 
-    private var eligibleCount: Int {
-        store.applications.filter { !$0.isCompleted && $0.eligibility == .eligible }.count
-    }
-
-    private var reviewCount: Int {
-        store.applications.filter { !$0.isCompleted && $0.eligibility == .needsReview }.count
-    }
-
-    private var displayedApplications: [ApplicationItem] {
-        store.applications
-            .filter { application in
-                let matchesStatus: Bool
-                switch statusFilter {
-                case .all, .preparing:
-                    matchesStatus = !application.isCompleted
-                case .urgent:
-                    matchesStatus = !application.isCompleted && (0...7).contains(application.daysRemaining)
-                case .needsReview:
-                    matchesStatus = !application.isCompleted && application.eligibility == .needsReview
-                case .completed:
-                    matchesStatus = application.isCompleted
-                }
-
-                let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-                let matchesSearch = query.isEmpty
-                    || application.title.localizedCaseInsensitiveContains(query)
-                    || application.organization.localizedCaseInsensitiveContains(query)
-                    || application.category.rawValue.localizedCaseInsensitiveContains(query)
-
-                return matchesStatus && matchesSearch
-            }
-            .sorted { $0.deadline < $1.deadline }
-    }
-
-    private var sectionTitle: String {
-        switch statusFilter {
-        case .all, .preparing: "진행 중인 지원"
-        case .urgent: "마감 임박 지원"
-        case .needsReview: "확인이 필요한 지원"
-        case .completed: "보관된 지원"
-        }
-    }
-
-    private func compactEligibility(_ state: EligibilityState) -> String {
-        switch state {
-        case .eligible: "지원 적격"
-        case .needsReview: "확인 필요"
-        case .difficult: "지원 어려움"
-        }
-    }
-
-    private func formattedShortDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "M월 d일"
-        return formatter.string(from: date)
-    }
-
-    private func formattedDeadline(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "M월 d일 a h:mm"
-        return formatter.string(from: date)
-    }
-
-    private func isSupportedImport(_ url: URL) -> Bool {
-        ["pdf", "png", "jpg", "jpeg", "heic"].contains(url.pathExtension.lowercased())
-    }
 }

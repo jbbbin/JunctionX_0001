@@ -14,13 +14,39 @@
 		A10000000000000000000005 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* DesignSystem.swift */; };
 		A10000000000000000000006 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* DashboardView.swift */; };
 		A10000000000000000000007 /* AddApplicationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* AddApplicationView.swift */; };
-		A10000000000000000000008 /* ApplicationWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* ApplicationWorkspaceView.swift */; };
 		A10000000000000000000009 /* MyProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* MyProfileView.swift */; };
 		A1000000000000000000000A /* MyDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* MyDocumentsView.swift */; };
-		A1000000000000000000000B /* NoticeViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* NoticeViewerView.swift */; };
 		A1000000000000000000000C /* SourcePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* SourcePreviewView.swift */; };
-		A1000000000000000000000D /* DualApplicationWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* DualApplicationWorkspaceView.swift */; };
+		A1000000000000000000000D /* ApplicationWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* ApplicationWorkspaceView.swift */; };
+		B10000000000000000000001 /* AppDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* AppDependencies.swift */; };
+		B10000000000000000000002 /* ModelPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000002 /* ModelPresentation.swift */; };
+		B10000000000000000000003 /* ApplicationAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* ApplicationAnalysisService.swift */; };
+		B10000000000000000000004 /* BrowserAddressResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000004 /* BrowserAddressResolver.swift */; };
+		B10000000000000000000005 /* ExternalActionServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000005 /* ExternalActionServices.swift */; };
+		B10000000000000000000006 /* AddApplicationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000006 /* AddApplicationViewModel.swift */; };
+		B10000000000000000000007 /* ApplicationWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* ApplicationWorkspaceViewModel.swift */; };
+		B10000000000000000000008 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* DashboardViewModel.swift */; };
+		B10000000000000000000009 /* DocumentsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000009 /* DocumentsViewModel.swift */; };
+		B1000000000000000000000A /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000A /* ProfileViewModel.swift */; };
+		B1000000000000000000000B /* RootViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000B /* RootViewModel.swift */; };
+		B1000000000000000000000C /* StoreBackedViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000C /* StoreBackedViewModel.swift */; };
+		B1000000000000000000000D /* WebBrowserViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000D /* WebBrowserViewModel.swift */; };
+		B1000000000000000000000E /* UpstageAPIKeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000E /* UpstageAPIKeyStore.swift */; };
+		B1000000000000000000000F /* UpstageAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000F /* UpstageAPIClient.swift */; };
+		B10000000000000000000010 /* LocalUpstageApplicationAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000010 /* LocalUpstageApplicationAnalysisService.swift */; };
+		B10000000000000000000011 /* RenderedWebContentLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000011 /* RenderedWebContentLoader.swift */; };
+		C10000000000000000000001 /* ApplicationWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* ApplicationWorkspaceTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C80000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A40000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A40000000000000000000002;
+			remoteInfo = ApplicationWorkspace;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A20000000000000000000001 /* ApplicationWorkspaceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationWorkspaceApp.swift; sourceTree = "<group>"; };
@@ -30,18 +56,42 @@
 		A20000000000000000000005 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		A20000000000000000000006 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* AddApplicationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddApplicationView.swift; sourceTree = "<group>"; };
-		A20000000000000000000008 /* ApplicationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationWorkspaceView.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* MyProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyProfileView.swift; sourceTree = "<group>"; };
 		A2000000000000000000000A /* MyDocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyDocumentsView.swift; sourceTree = "<group>"; };
-		A2000000000000000000000B /* NoticeViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticeViewerView.swift; sourceTree = "<group>"; };
 		A2000000000000000000000C /* ApplicationWorkspace.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ApplicationWorkspace.entitlements; sourceTree = "<group>"; };
 		A2000000000000000000000D /* ApplicationWorkspace.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ApplicationWorkspace.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2000000000000000000000E /* SourcePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourcePreviewView.swift; sourceTree = "<group>"; };
-		A2000000000000000000000F /* DualApplicationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DualApplicationWorkspaceView.swift; sourceTree = "<group>"; };
+		A2000000000000000000000F /* ApplicationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationWorkspaceView.swift; sourceTree = "<group>"; };
+		B20000000000000000000001 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
+		B20000000000000000000002 /* ModelPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPresentation.swift; sourceTree = "<group>"; };
+		B20000000000000000000003 /* ApplicationAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationAnalysisService.swift; sourceTree = "<group>"; };
+		B20000000000000000000004 /* BrowserAddressResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserAddressResolver.swift; sourceTree = "<group>"; };
+		B20000000000000000000005 /* ExternalActionServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalActionServices.swift; sourceTree = "<group>"; };
+		B20000000000000000000006 /* AddApplicationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddApplicationViewModel.swift; sourceTree = "<group>"; };
+		B20000000000000000000007 /* ApplicationWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationWorkspaceViewModel.swift; sourceTree = "<group>"; };
+		B20000000000000000000008 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
+		B20000000000000000000009 /* DocumentsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentsViewModel.swift; sourceTree = "<group>"; };
+		B2000000000000000000000A /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
+		B2000000000000000000000B /* RootViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootViewModel.swift; sourceTree = "<group>"; };
+		B2000000000000000000000C /* StoreBackedViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreBackedViewModel.swift; sourceTree = "<group>"; };
+		B2000000000000000000000D /* WebBrowserViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebBrowserViewModel.swift; sourceTree = "<group>"; };
+		B2000000000000000000000E /* UpstageAPIKeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpstageAPIKeyStore.swift; sourceTree = "<group>"; };
+		B2000000000000000000000F /* UpstageAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpstageAPIClient.swift; sourceTree = "<group>"; };
+		B20000000000000000000010 /* LocalUpstageApplicationAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalUpstageApplicationAnalysisService.swift; sourceTree = "<group>"; };
+		B20000000000000000000011 /* RenderedWebContentLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderedWebContentLoader.swift; sourceTree = "<group>"; };
+		C20000000000000000000001 /* ApplicationWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationWorkspaceTests.swift; sourceTree = "<group>"; };
+		C20000000000000000000002 /* ApplicationWorkspaceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ApplicationWorkspaceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A50000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C50000000000000000000002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -55,6 +105,7 @@
 			isa = PBXGroup;
 			children = (
 				A30000000000000000000003 /* ApplicationWorkspace */,
+				C30000000000000000000001 /* ApplicationWorkspaceTests */,
 				A30000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -63,6 +114,7 @@
 			isa = PBXGroup;
 			children = (
 				A2000000000000000000000D /* ApplicationWorkspace.app */,
+				C20000000000000000000002 /* ApplicationWorkspaceTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -73,6 +125,8 @@
 				A30000000000000000000004 /* App */,
 				A30000000000000000000005 /* Models */,
 				A30000000000000000000006 /* Stores */,
+				B30000000000000000000001 /* Services */,
+				B30000000000000000000002 /* ViewModels */,
 				A30000000000000000000007 /* Components */,
 				A30000000000000000000008 /* Views */,
 				A2000000000000000000000C /* ApplicationWorkspace.entitlements */,
@@ -85,6 +139,7 @@
 			children = (
 				A20000000000000000000001 /* ApplicationWorkspaceApp.swift */,
 				A20000000000000000000002 /* RootView.swift */,
+				B20000000000000000000001 /* AppDependencies.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -109,6 +164,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000005 /* DesignSystem.swift */,
+				B20000000000000000000002 /* ModelPresentation.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -121,7 +177,6 @@
 				A3000000000000000000000B /* Workspace */,
 				A3000000000000000000000C /* Profile */,
 				A3000000000000000000000D /* Documents */,
-				A3000000000000000000000E /* Notice */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -145,8 +200,7 @@
 		A3000000000000000000000B /* Workspace */ = {
 			isa = PBXGroup;
 			children = (
-				A20000000000000000000008 /* ApplicationWorkspaceView.swift */,
-				A2000000000000000000000F /* DualApplicationWorkspaceView.swift */,
+				A2000000000000000000000F /* ApplicationWorkspaceView.swift */,
 				A2000000000000000000000E /* SourcePreviewView.swift */,
 			);
 			path = Workspace;
@@ -168,12 +222,41 @@
 			path = Documents;
 			sourceTree = "<group>";
 		};
-		A3000000000000000000000E /* Notice */ = {
+		B30000000000000000000001 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				A2000000000000000000000B /* NoticeViewerView.swift */,
+				B20000000000000000000003 /* ApplicationAnalysisService.swift */,
+				B20000000000000000000010 /* LocalUpstageApplicationAnalysisService.swift */,
+				B20000000000000000000011 /* RenderedWebContentLoader.swift */,
+				B2000000000000000000000F /* UpstageAPIClient.swift */,
+				B2000000000000000000000E /* UpstageAPIKeyStore.swift */,
+				B20000000000000000000004 /* BrowserAddressResolver.swift */,
+				B20000000000000000000005 /* ExternalActionServices.swift */,
 			);
-			path = Notice;
+			path = Services;
+			sourceTree = "<group>";
+		};
+		B30000000000000000000002 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000006 /* AddApplicationViewModel.swift */,
+				B20000000000000000000007 /* ApplicationWorkspaceViewModel.swift */,
+				B20000000000000000000008 /* DashboardViewModel.swift */,
+				B20000000000000000000009 /* DocumentsViewModel.swift */,
+				B2000000000000000000000A /* ProfileViewModel.swift */,
+				B2000000000000000000000B /* RootViewModel.swift */,
+				B2000000000000000000000C /* StoreBackedViewModel.swift */,
+				B2000000000000000000000D /* WebBrowserViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		C30000000000000000000001 /* ApplicationWorkspaceTests */ = {
+			isa = PBXGroup;
+			children = (
+				C20000000000000000000001 /* ApplicationWorkspaceTests.swift */,
+			);
+			path = ApplicationWorkspaceTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -196,6 +279,24 @@
 			productReference = A2000000000000000000000D /* ApplicationWorkspace.app */;
 			productType = "com.apple.product-type.application";
 		};
+		C40000000000000000000001 /* ApplicationWorkspaceTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C70000000000000000000001 /* Build configuration list for PBXNativeTarget "ApplicationWorkspaceTests" */;
+			buildPhases = (
+				C50000000000000000000001 /* Sources */,
+				C50000000000000000000002 /* Frameworks */,
+				C50000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C90000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = ApplicationWorkspaceTests;
+			productName = ApplicationWorkspaceTests;
+			productReference = C20000000000000000000002 /* ApplicationWorkspaceTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -208,6 +309,10 @@
 				TargetAttributes = {
 					A40000000000000000000002 = {
 						CreatedOnToolsVersion = 26.0;
+					};
+					C40000000000000000000001 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = A40000000000000000000002;
 					};
 				};
 			};
@@ -225,12 +330,20 @@
 			projectRoot = "";
 			targets = (
 				A40000000000000000000002 /* ApplicationWorkspace */,
+				C40000000000000000000001 /* ApplicationWorkspaceTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A50000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C50000000000000000000003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -251,16 +364,47 @@
 				A10000000000000000000005 /* DesignSystem.swift in Sources */,
 				A10000000000000000000006 /* DashboardView.swift in Sources */,
 				A10000000000000000000007 /* AddApplicationView.swift in Sources */,
-				A10000000000000000000008 /* ApplicationWorkspaceView.swift in Sources */,
 				A10000000000000000000009 /* MyProfileView.swift in Sources */,
 				A1000000000000000000000A /* MyDocumentsView.swift in Sources */,
-				A1000000000000000000000B /* NoticeViewerView.swift in Sources */,
 				A1000000000000000000000C /* SourcePreviewView.swift in Sources */,
-				A1000000000000000000000D /* DualApplicationWorkspaceView.swift in Sources */,
+				A1000000000000000000000D /* ApplicationWorkspaceView.swift in Sources */,
+				B10000000000000000000001 /* AppDependencies.swift in Sources */,
+				B10000000000000000000002 /* ModelPresentation.swift in Sources */,
+				B10000000000000000000003 /* ApplicationAnalysisService.swift in Sources */,
+				B10000000000000000000004 /* BrowserAddressResolver.swift in Sources */,
+				B10000000000000000000005 /* ExternalActionServices.swift in Sources */,
+				B10000000000000000000006 /* AddApplicationViewModel.swift in Sources */,
+				B10000000000000000000007 /* ApplicationWorkspaceViewModel.swift in Sources */,
+				B10000000000000000000008 /* DashboardViewModel.swift in Sources */,
+				B10000000000000000000009 /* DocumentsViewModel.swift in Sources */,
+				B1000000000000000000000A /* ProfileViewModel.swift in Sources */,
+				B1000000000000000000000B /* RootViewModel.swift in Sources */,
+				B1000000000000000000000C /* StoreBackedViewModel.swift in Sources */,
+				B1000000000000000000000D /* WebBrowserViewModel.swift in Sources */,
+				B1000000000000000000000E /* UpstageAPIKeyStore.swift in Sources */,
+				B1000000000000000000000F /* UpstageAPIClient.swift in Sources */,
+				B10000000000000000000010 /* LocalUpstageApplicationAnalysisService.swift in Sources */,
+				B10000000000000000000011 /* RenderedWebContentLoader.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C50000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000000000000000000001 /* ApplicationWorkspaceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C90000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A40000000000000000000002 /* ApplicationWorkspace */;
+			targetProxy = C80000000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A60000000000000000000001 /* Debug */ = {
@@ -426,6 +570,50 @@
 			};
 			name = Release;
 		};
+		C60000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.junctionx.ApplicationWorkspaceTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ApplicationWorkspace.app/Contents/MacOS/ApplicationWorkspace";
+			};
+			name = Debug;
+		};
+		C60000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.junctionx.ApplicationWorkspaceTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ApplicationWorkspace.app/Contents/MacOS/ApplicationWorkspace";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -443,6 +631,15 @@
 			buildConfigurations = (
 				A60000000000000000000003 /* Debug */,
 				A60000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C70000000000000000000001 /* Build configuration list for PBXNativeTarget "ApplicationWorkspaceTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C60000000000000000000001 /* Debug */,
+				C60000000000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -1,16 +1,4 @@
 import Foundation
-import SwiftUI
-
-enum SidebarRoute: Hashable {
-    case dashboard
-    case applications
-    case profile
-    case documents
-    case archive
-    case urgent
-    case needsReview
-    case application(UUID)
-}
 
 enum ApplicationCategory: String, CaseIterable, Identifiable {
     case employment = "채용"
@@ -18,86 +6,73 @@ enum ApplicationCategory: String, CaseIterable, Identifiable {
     case competition = "공모전·대회"
 
     var id: String { rawValue }
-
-    var icon: String {
-        switch self {
-        case .employment: "briefcase.fill"
-        case .scholarship: "graduationcap.fill"
-        case .competition: "trophy.fill"
-        }
-    }
-
-    var tint: Color {
-        switch self {
-        case .employment: Color(red: 0.29, green: 0.36, blue: 0.96)
-        case .scholarship: Color(red: 0.10, green: 0.62, blue: 0.48)
-        case .competition: Color(red: 0.94, green: 0.48, blue: 0.18)
-        }
-    }
 }
 
 enum EligibilityState: String, CaseIterable {
     case eligible = "지원 가능"
     case needsReview = "확인 필요"
     case difficult = "지원 어려움"
-
-    var icon: String {
-        switch self {
-        case .eligible: "checkmark.circle.fill"
-        case .needsReview: "questionmark.circle.fill"
-        case .difficult: "xmark.circle.fill"
-        }
-    }
-
-    var tint: Color {
-        switch self {
-        case .eligible: .green
-        case .needsReview: .orange
-        case .difficult: .red
-        }
-    }
 }
 
 enum RequirementState: String {
     case satisfied = "충족"
     case needsReview = "확인 필요"
     case unsatisfied = "미충족"
-
-    var icon: String {
-        switch self {
-        case .satisfied: "checkmark.circle.fill"
-        case .needsReview: "questionmark.circle.fill"
-        case .unsatisfied: "xmark.circle.fill"
-        }
-    }
-
-    var tint: Color {
-        switch self {
-        case .satisfied: .green
-        case .needsReview: .orange
-        case .unsatisfied: .red
-        }
-    }
 }
 
 enum DocumentPreparationType: String {
     case owned = "보유 문서"
     case write = "작성 필요"
     case request = "외부 요청"
+}
 
-    var icon: String {
-        switch self {
-        case .owned: "doc.badge.checkmark"
-        case .write: "square.and.pencil"
-        case .request: "person.crop.circle.badge.questionmark"
-        }
+enum DocumentRequestState: String, Hashable {
+    case notRequested = "요청 전"
+    case requested = "요청됨"
+    case received = "수령 완료"
+}
+
+enum ApplicationStatus: String, Hashable {
+    case preparing = "준비 중"
+    case submitted = "제출 완료"
+    case archived = "보관됨"
+}
+
+enum SourceLocation: Hashable {
+    case web(url: URL?, anchor: String? = nil)
+    case pdf(page: Int)
+}
+
+struct EvidenceReference: Hashable {
+    var location: SourceLocation
+    var excerpt: String?
+
+    init(location: SourceLocation, excerpt: String? = nil) {
+        self.location = location
+        self.excerpt = excerpt
     }
+}
 
-    var tint: Color {
+struct ApplicationSource: Hashable {
+    var webURL: URL?
+    var documentURL: URL?
+    var displayName: String
+
+    init(webURL: URL? = nil, documentURL: URL? = nil, displayName: String) {
+        self.webURL = webURL
+        self.documentURL = documentURL
+        self.displayName = displayName
+    }
+}
+
+enum ImportedSource: Hashable {
+    case file(URL)
+    case web(URL)
+
+    var displayName: String {
         switch self {
-        case .owned: .blue
-        case .write: .purple
-        case .request: .orange
+        case let .file(url): url.lastPathComponent
+        case let .web(url): url.host() ?? url.absoluteString
         }
     }
 }
@@ -107,7 +82,7 @@ struct EligibilityRequirement: Identifiable, Hashable {
     var title: String
     var detail: String
     var state: RequirementState
-    var sourcePage: Int
+    var evidence: EvidenceReference
 
     init(
         id: UUID = UUID(),
@@ -120,7 +95,21 @@ struct EligibilityRequirement: Identifiable, Hashable {
         self.title = title
         self.detail = detail
         self.state = state
-        self.sourcePage = sourcePage
+        evidence = EvidenceReference(location: .pdf(page: max(1, sourcePage)))
+    }
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        detail: String,
+        state: RequirementState,
+        evidence: EvidenceReference
+    ) {
+        self.id = id
+        self.title = title
+        self.detail = detail
+        self.state = state
+        self.evidence = evidence
     }
 }
 
@@ -130,6 +119,8 @@ struct RequiredDocument: Identifiable, Hashable {
     var preparationType: DocumentPreparationType
     var isReady: Bool
     var linkedFilename: String?
+    var linkedFileURL: URL?
+    var requestState: DocumentRequestState
     var note: String
 
     init(
@@ -138,6 +129,8 @@ struct RequiredDocument: Identifiable, Hashable {
         preparationType: DocumentPreparationType,
         isReady: Bool = false,
         linkedFilename: String? = nil,
+        linkedFileURL: URL? = nil,
+        requestState: DocumentRequestState = .notRequested,
         note: String = ""
     ) {
         self.id = id
@@ -145,6 +138,8 @@ struct RequiredDocument: Identifiable, Hashable {
         self.preparationType = preparationType
         self.isReady = isReady
         self.linkedFilename = linkedFilename
+        self.linkedFileURL = linkedFileURL
+        self.requestState = requestState
         self.note = note
     }
 }
@@ -154,28 +149,24 @@ struct ApplicationItem: Identifiable, Hashable {
     var category: ApplicationCategory
     var title: String
     var organization: String
-    var deadline: Date
+    var deadline: Date?
     var eligibility: EligibilityState
     var requirements: [EligibilityRequirement]
     var requiredDocuments: [RequiredDocument]
-    var nextAction: String
-    var applicationURL: URL?
-    var sourceFilename: String
-    var isCompleted: Bool
+    var source: ApplicationSource
+    var status: ApplicationStatus
 
     init(
         id: UUID = UUID(),
         category: ApplicationCategory,
         title: String,
         organization: String,
-        deadline: Date,
+        deadline: Date?,
         eligibility: EligibilityState,
         requirements: [EligibilityRequirement],
         requiredDocuments: [RequiredDocument],
-        nextAction: String,
-        applicationURL: URL?,
-        sourceFilename: String,
-        isCompleted: Bool = false
+        source: ApplicationSource,
+        status: ApplicationStatus = .preparing
     ) {
         self.id = id
         self.category = category
@@ -185,11 +176,13 @@ struct ApplicationItem: Identifiable, Hashable {
         self.eligibility = eligibility
         self.requirements = requirements
         self.requiredDocuments = requiredDocuments
-        self.nextAction = nextAction
-        self.applicationURL = applicationURL
-        self.sourceFilename = sourceFilename
-        self.isCompleted = isCompleted
+        self.source = source
+        self.status = status
     }
+
+    var applicationURL: URL? { source.webURL }
+    var sourceFilename: String { source.displayName }
+    var isCompleted: Bool { status == .submitted || status == .archived }
 
     var readyDocumentCount: Int {
         requiredDocuments.filter(\.isReady).count
@@ -200,7 +193,7 @@ struct ApplicationItem: Identifiable, Hashable {
     }
 
     var progress: Double {
-        guard !requiredDocuments.isEmpty else { return 0 }
+        guard !requiredDocuments.isEmpty else { return 1 }
         return Double(readyDocumentCount) / Double(requiredDocuments.count)
     }
 
@@ -208,16 +201,55 @@ struct ApplicationItem: Identifiable, Hashable {
         Int((progress * 100).rounded())
     }
 
-    var daysRemaining: Int {
-        Calendar.current.dateComponents(
+    var isReadyToSubmit: Bool {
+        deadline != nil
+            && eligibility == .eligible
+            && requirements.allSatisfy { $0.state == .satisfied }
+            && requiredDocuments.allSatisfy(\.isReady)
+    }
+
+    var nextAction: String {
+        if let requirement = requirements.first(where: { $0.state == .unsatisfied }) {
+            return "\(requirement.title) 조건을 다시 확인해 주세요"
+        }
+
+        if let requirement = requirements.first(where: { $0.state == .needsReview }) {
+            return "\(requirement.title) 조건을 확인해 주세요"
+        }
+
+        if deadline == nil {
+            return "마감일을 확인해 주세요"
+        }
+
+        if let document = requiredDocuments.first(where: { !$0.isReady }) {
+            if document.preparationType == .request, document.requestState == .requested {
+                return "\(document.name) 수령을 기다리고 있어요"
+            }
+
+            switch document.preparationType {
+            case .owned: return "\(document.name) 파일을 연결해 주세요"
+            case .write: return "\(document.name)\(document.name.koreanObjectParticle) 작성해 주세요"
+            case .request: return "\(document.name)\(document.name.koreanObjectParticle) 요청해 주세요"
+            }
+        }
+
+        return isReadyToSubmit ? "공식 접수처에서 제출해 주세요" : "자격 조건을 확인해 주세요"
+    }
+
+    func daysRemaining(relativeTo now: Date = Date(), calendar: Calendar = .current) -> Int? {
+        guard let deadline else { return nil }
+        return calendar.dateComponents(
             [.day],
-            from: Calendar.current.startOfDay(for: Date()),
-            to: Calendar.current.startOfDay(for: deadline)
+            from: calendar.startOfDay(for: now),
+            to: calendar.startOfDay(for: deadline)
         ).day ?? 0
     }
 
+    var daysRemaining: Int? { daysRemaining() }
+
     var dDayText: String {
-        switch daysRemaining {
+        guard let daysRemaining else { return "마감 확인 필요" }
+        return switch daysRemaining {
         case let value where value > 0: "D-\(value)"
         case 0: "D-Day"
         default: "마감"
@@ -225,7 +257,18 @@ struct ApplicationItem: Identifiable, Hashable {
     }
 }
 
+private extension String {
+    var koreanObjectParticle: String {
+        guard let scalar = unicodeScalars.last?.value,
+              (0xAC00...0xD7A3).contains(scalar)
+        else { return "을" }
+
+        return (scalar - 0xAC00) % 28 == 0 ? "를" : "을"
+    }
+}
+
 struct UserProfile: Equatable {
+    var name: String = "홍길동"
     var school: String
     var enrollmentStatus: String
     var grade: Int
@@ -233,6 +276,10 @@ struct UserProfile: Equatable {
     var incomeBracket: String
     var major: String
     var region: String
+
+    var avatarInitial: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).first.map(String.init) ?? "?"
+    }
 }
 
 struct OwnedDocument: Identifiable, Hashable {
