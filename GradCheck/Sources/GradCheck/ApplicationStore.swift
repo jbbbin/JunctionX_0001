@@ -84,6 +84,28 @@ struct ApplicationSession: Identifiable {
     }
 }
 
+struct WorkspaceOverviewItem: Identifiable {
+    let workspace: ApplicationWorkspace
+    let requirementCount: Int
+    let requiredDocumentCount: Int
+    let readyDocumentCount: Int
+    let blockedCount: Int
+    let reviewCount: Int
+    let readyFindingCount: Int
+    let hasCurrentAudit: Bool
+
+    var id: UUID { workspace.id }
+    var missingDocumentCount: Int { max(requiredDocumentCount - readyDocumentCount, 0) }
+}
+
+struct PortfolioFindingItem: Identifiable {
+    let workspaceID: UUID
+    let workspaceTitle: String
+    let finding: AuditFinding
+
+    var id: UUID { finding.id }
+}
+
 struct ApplicationPortfolio {
     var sessions: [ApplicationSession]
     var selectedWorkspaceID: UUID

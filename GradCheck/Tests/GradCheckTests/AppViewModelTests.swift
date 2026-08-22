@@ -325,6 +325,39 @@ final class AppViewModelTests: XCTestCase {
         XCTAssertEqual(state.auditRoute, .list)
     }
 
+    func testPortfolioOverviewAggregatesAllWorkspacesAndRoutesToFindingOwner() throws {
+        let state = AppViewModel(loadSavedState: false, environment: [:])
+        state.addWorkspace(
+            draft: WorkspaceDraft(
+                school: "MIT",
+                program: "EECS",
+                degree: "PhD",
+                intake: "Fall 2027",
+                applicantName: ""
+            ),
+            analysis: requirementAnalysis(type: .sop, source: "mit.txt")
+        )
+
+        let summaries = state.workspaceOverviewItems
+        XCTAssertEqual(summaries.count, state.workspaces.count)
+        XCTAssertEqual(
+            state.portfolioRequiredDocumentCount,
+            summaries.reduce(0) { $0 + $1.requiredDocumentCount }
+        )
+        XCTAssertEqual(
+            state.portfolioBlockedCount,
+            summaries.reduce(0) { $0 + $1.blockedCount }
+        )
+
+        let item = try XCTUnwrap(state.portfolioFindingItems.first)
+        state.showPortfolioFinding(item)
+
+        XCTAssertEqual(state.selectedWorkspaceID, item.workspaceID)
+        XCTAssertEqual(state.selectedFindingID, item.finding.id)
+        XCTAssertEqual(state.destination, .audit)
+        XCTAssertEqual(state.auditRoute, .detail)
+    }
+
     func testDeletingLastWorkspaceIsRejected() {
         let state = AppViewModel(loadSavedState: false, environment: [:])
         let lastID = state.selectedWorkspaceID

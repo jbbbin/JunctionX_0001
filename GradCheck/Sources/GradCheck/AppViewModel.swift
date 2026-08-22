@@ -66,6 +66,41 @@ final class AppViewModel: ObservableObject {
     var requiredDocumentCount: Int { selectedSession.requiredDocumentCount }
     var readyDocumentCount: Int { selectedSession.readyDocumentCount }
 
+    var workspaceOverviewItems: [WorkspaceOverviewItem] {
+        portfolio.sessions.map { session in
+            WorkspaceOverviewItem(
+                workspace: session.workspace,
+                requirementCount: session.requirements.count,
+                requiredDocumentCount: session.requiredDocumentCount,
+                readyDocumentCount: session.readyDocumentCount,
+                blockedCount: session.findings.filter { $0.status == .blocked }.count,
+                reviewCount: session.findings.filter { $0.status == .humanReview }.count,
+                readyFindingCount: session.findings.filter { $0.status == .ready }.count,
+                hasCurrentAudit: session.workspace.status != .preparing
+                    && !session.findings.isEmpty
+                    && session.workspace.lastAuditedAt != nil
+            )
+        }
+    }
+
+    var portfolioFindingItems: [PortfolioFindingItem] {
+        portfolio.sessions.flatMap { session in
+            session.findings.map {
+                PortfolioFindingItem(
+                    workspaceID: session.id,
+                    workspaceTitle: session.workspace.compactTitle,
+                    finding: $0
+                )
+            }
+        }
+    }
+
+    var portfolioBlockedCount: Int { workspaceOverviewItems.reduce(0) { $0 + $1.blockedCount } }
+    var portfolioReviewCount: Int { workspaceOverviewItems.reduce(0) { $0 + $1.reviewCount } }
+    var portfolioReadyFindingCount: Int { workspaceOverviewItems.reduce(0) { $0 + $1.readyFindingCount } }
+    var portfolioRequiredDocumentCount: Int { workspaceOverviewItems.reduce(0) { $0 + $1.requiredDocumentCount } }
+    var portfolioReadyDocumentCount: Int { workspaceOverviewItems.reduce(0) { $0 + $1.readyDocumentCount } }
+
     var providerLabel: String { graduateRequirementsAnalyzer.providerLabel }
     var isUpstageConnected: Bool { graduateRequirementsAnalyzer.hasAPIKey }
     var hasStoredUpstageAPIKey: Bool { graduateRequirementsAnalyzer.hasAPIKey }
@@ -135,6 +170,18 @@ final class AppViewModel: ObservableObject {
     }
 
     func showSelectedWorkspaceAudit() {
+        destination = .audit
+        auditRoute = .detail
+    }
+
+    func showWorkspaceRequirements(_ id: UUID) {
+        selectWorkspace(id)
+        destination = .requirements
+    }
+
+    func showPortfolioFinding(_ item: PortfolioFindingItem) {
+        selectWorkspace(item.workspaceID)
+        selectedFindingID = item.finding.id
         destination = .audit
         auditRoute = .detail
     }

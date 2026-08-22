@@ -3,8 +3,42 @@ import SwiftUI
 struct OverviewView: View {
     @EnvironmentObject private var state: AppViewModel
 
-    private var priorityFindings: [AuditFinding] {
-        Array(state.findings.filter { $0.status != .ready }.prefix(3))
+    private var summaries: [WorkspaceOverviewItem] {
+        state.workspaceOverviewItems
+    }
+
+    private var priorityFindings: [PortfolioFindingItem] {
+        Array(
+            state.portfolioFindingItems
+                .filter { $0.finding.status != .ready }
+                .sorted {
+                    if $0.finding.status.rank != $1.finding.status.rank {
+                        return $0.finding.status.rank < $1.finding.status.rank
+                    }
+                    return $0.workspaceTitle < $1.workspaceTitle
+                }
+                .prefix(4)
+        )
+    }
+
+    private var missingRequirements: [WorkspaceOverviewItem] {
+        summaries.filter { $0.requirementCount == 0 || $0.requiredDocumentCount == 0 }
+    }
+
+    private var incompleteDocuments: [WorkspaceOverviewItem] {
+        summaries.filter { $0.missingDocumentCount > 0 }
+    }
+
+    private var unauditedWorkspaces: [WorkspaceOverviewItem] {
+        summaries.filter { !$0.hasCurrentAudit }
+    }
+
+    private var missingDocumentCount: Int {
+        summaries.reduce(0) { $0 + $1.missingDocumentCount }
+    }
+
+    private var auditedWorkspaceCount: Int {
+        summaries.filter(\.hasCurrentAudit).count
     }
 
     var body: some View {
@@ -13,16 +47,16 @@ struct OverviewView: View {
                 summaryHero
 
                 HStack(spacing: 14) {
-                    StatusMetricCard(status: .blocked, count: state.blockedCount)
-                    StatusMetricCard(status: .humanReview, count: state.humanReviewCount)
-                    StatusMetricCard(status: .ready, count: state.readyCount)
+                    StatusMetricCard(status: .blocked, count: state.portfolioBlockedCount)
+                    StatusMetricCard(status: .humanReview, count: state.portfolioReviewCount)
+                    StatusMetricCard(status: .ready, count: state.portfolioReadyFindingCount)
                 }
 
                 HStack(alignment: .top, spacing: 18) {
                     priorityCard
                         .frame(maxWidth: .infinity)
-                    documentReadinessCard
-                        .frame(width: 330)
+                    portfolioReadinessCard
+                        .frame(width: 360)
                 }
 
                 safetyNote
@@ -58,27 +92,15 @@ struct OverviewView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: 610, alignment: .leading)
                     HStack(spacing: 10) {
-                        Button {
-                            if state.requirements.isEmpty || state.requiredDocumentTypes.isEmpty {
-                                state.destination = .requirements
-                            } else if state.readyDocumentCount < state.requiredDocumentCount {
-                                state.showSelectedWorkspaceDocuments()
-                            } else if !state.hasCurrentAudit {
-                                state.runAudit()
-                            } else if state.blockedCount > 0 || state.humanReviewCount > 0 {
-                                state.destination = .audit
-                            } else {
-                                state.runAudit()
-                            }
-                        } label: {
+                        Button(action: performHeroAction) {
                             Label(heroActionTitle, systemImage: "arrow.right")
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.white)
                         .foregroundStyle(GCTheme.brand)
 
-                        Button("지원 서류 보기") {
-                            state.showSelectedWorkspaceDocuments()
+                        Button("전체 지원 목록") {
+                            state.showWorkspaceList()
                         }
                         .buttonStyle(.bordered)
                         .tint(.white.opacity(0.9))
@@ -87,10 +109,10 @@ struct OverviewView: View {
                 }
                 Spacer()
                 VStack(alignment: .center, spacing: 5) {
-                    Text(state.hasCurrentAudit ? "\(state.blockedCount)" : "—")
+                    Text("\(summaries.count)")
                         .font(.system(size: 48, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
-                    Text(state.hasCurrentAudit ? "제출 전 수정 항목" : "검수 전")
+                    Text("전체 지원 항목")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.7))
                 }
@@ -120,43 +142,68 @@ struct OverviewView: View {
     }
 
     private var heroEyebrow: String {
-        if state.requirements.isEmpty { return "REQUIREMENTS FIRST" }
-        if state.readyDocumentCount < state.requiredDocumentCount { return "DOCUMENTS REQUIRED" }
-        if !state.hasCurrentAudit { return "AUDIT REQUIRED" }
-        return state.blockedCount > 0 ? "REVIEW NEEDED" : "READY FOR FINAL REVIEW"
+        if !missingRequirements.isEmpty { return "REQUIREMENTS FIRST" }
+        if missingDocumentCount > 0 { return "DOCUMENTS REQUIRED" }
+        if !unauditedWorkspaces.isEmpty { return "AUDITS REQUIRED" }
+        if state.portfolioBlockedCount > 0 { return "REVIEW NEEDED" }
+        return "PORTFOLIO OVERVIEW"
     }
 
     private var heroTitle: String {
-        if state.requirements.isEmpty { return "공식 모집요강부터 확인해 주세요" }
-        if state.readyDocumentCount < state.requiredDocumentCount {
-            return "필요 서류 \(state.requiredDocumentCount - state.readyDocumentCount)개가 남았어요"
+        if !missingRequirements.isEmpty {
+            return "\(missingRequirements.count)개 지원 항목의 모집요강을 확인해 주세요"
         }
-        if !state.hasCurrentAudit { return "현재 문서로 검수를 시작해 주세요" }
-        if state.blockedCount == 0 { return "제출 전 직접 확인만 남았어요" }
-        return "\(state.blockedCount)개의 문제를 먼저 해결해 주세요"
+        if missingDocumentCount > 0 {
+            return "전체 지원 서류 중 \(missingDocumentCount)개가 남았어요"
+        }
+        if !unauditedWorkspaces.isEmpty {
+            return "\(unauditedWorkspaces.count)개 지원 항목의 검수가 필요해요"
+        }
+        if state.portfolioBlockedCount > 0 {
+            return "전체 지원서에서 \(state.portfolioBlockedCount)개 문제를 발견했어요"
+        }
+        if state.portfolioReviewCount > 0 {
+            return "직접 확인할 항목 \(state.portfolioReviewCount)개가 남았어요"
+        }
+        return "모든 지원 항목이 제출 준비 상태예요"
     }
 
     private var heroMessage: String {
-        if state.requirements.isEmpty {
-            return "학교와 프로그램마다 필요한 서류가 다릅니다. 공식 모집요강을 먼저 분석해 이 지원서만의 체크리스트를 만드세요."
+        if !missingRequirements.isEmpty {
+            return "학교와 프로그램별 공식 모집요강을 기준으로 필요한 서류를 구성해야 전체 준비도를 정확히 계산할 수 있어요."
         }
-        if state.readyDocumentCount < state.requiredDocumentCount {
-            return "분석한 모집요강을 기준으로 제출 파일과 수량을 구성했습니다. 필요한 파일을 채운 뒤 교차 검수를 시작할 수 있어요."
+        if missingDocumentCount > 0 {
+            return "모든 지원 항목의 필요 서류를 합산했습니다. 누락된 파일이 있는 지원서부터 채워 검수 가능한 상태로 만드세요."
         }
-        if !state.hasCurrentAudit {
-            return "문서가 바뀌면 이전 결과는 자동으로 무효화됩니다. 현재 파일을 기준으로 누락과 불일치, 페이지 근거를 다시 만들어요."
+        if !unauditedWorkspaces.isEmpty {
+            return "지원서별로 현재 파일을 다시 읽어 누락과 불일치, 페이지 근거를 확인해야 해요."
         }
-        if state.blockedCount == 0 {
-            return "업로드된 근거 기준으로 제출을 막는 문제는 발견되지 않았습니다. HUMAN REVIEW 항목은 본인 또는 기관과 최종 확인하세요."
+        if state.portfolioBlockedCount > 0 || state.portfolioReviewCount > 0 {
+            return "학교별 검수 결과를 한곳에 모았습니다. 우선순위가 높은 문제를 선택하면 해당 지원서의 근거와 수정 방향으로 이동해요."
         }
-        return "가장 중요한 문제부터 문서와 페이지 근거를 연결해 두었습니다. 파일을 수정해 교체하면 영향받은 항목을 다시 검수할 수 있어요."
+        return "등록된 모든 지원 항목의 모집요강, 서류 준비도와 검수 결과를 합산한 현재 상태입니다."
     }
 
     private var heroActionTitle: String {
-        if state.requirements.isEmpty { return "모집요강 추가" }
-        if state.readyDocumentCount < state.requiredDocumentCount { return "필요 서류 채우기" }
-        if !state.hasCurrentAudit { return "검수 시작" }
-        return state.blockedCount > 0 ? "문제부터 확인" : "다시 검수"
+        if !missingRequirements.isEmpty { return "모집요강 확인" }
+        if missingDocumentCount > 0 { return "필요 서류 채우기" }
+        if !unauditedWorkspaces.isEmpty { return "검수할 지원서 보기" }
+        if state.portfolioBlockedCount > 0 || state.portfolioReviewCount > 0 { return "문제부터 확인" }
+        return "전체 검수 보기"
+    }
+
+    private func performHeroAction() {
+        if let item = missingRequirements.first {
+            state.showWorkspaceRequirements(item.id)
+        } else if let item = incompleteDocuments.first {
+            state.showWorkspaceDocuments(item.id)
+        } else if let item = unauditedWorkspaces.first {
+            state.showWorkspaceAudit(item.id)
+        } else if let item = priorityFindings.first {
+            state.showPortfolioFinding(item)
+        } else {
+            state.showAuditList()
+        }
     }
 
     private var priorityCard: some View {
@@ -164,13 +211,13 @@ struct OverviewView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top) {
                     SectionTitle(
-                        "먼저 확인할 항목",
+                        "전체 우선 피드백",
                         eyebrow: "PRIORITY",
-                        subtitle: "BLOCKED와 HUMAN REVIEW를 우선순위대로 보여드려요."
+                        subtitle: "모든 지원서의 BLOCKED와 HUMAN REVIEW를 함께 보여드려요."
                     )
                     Spacer()
-                    Button("전체 리포트") {
-                        state.destination = .audit
+                    Button("검수 목록") {
+                        state.showAuditList()
                     }
                     .buttonStyle(.plain)
                     .font(.system(size: 12, weight: .semibold))
@@ -178,30 +225,21 @@ struct OverviewView: View {
                 }
                 .padding(.bottom, 13)
 
-                if !state.hasCurrentAudit {
+                if priorityFindings.isEmpty {
                     EmptyStateView(
-                        symbol: state.requirements.isEmpty ? "building.columns" : "sparkles",
-                        title: state.requirements.isEmpty ? "모집요강이 필요해요" : "현재 문서의 검수가 필요해요",
-                        message: state.requirements.isEmpty
-                            ? "공식 모집요강을 먼저 분석해 지원서별 필요 서류를 구성하세요."
-                            : "지원 패키지 검수를 실행하면 우선순위와 원문 근거가 여기에 표시됩니다.",
-                        actionTitle: state.requirements.isEmpty ? "모집요강 추가" : "검수 시작",
-                        action: {
-                            if state.requirements.isEmpty { state.destination = .requirements }
-                            else { state.runAudit() }
-                        }
-                    )
-                } else if priorityFindings.isEmpty {
-                    EmptyStateView(
-                        symbol: "checkmark.seal.fill",
-                        title: "우선 확인할 문제가 없어요",
-                        message: "READY 결과와 직접 확인 항목을 최종 점검하세요."
+                        symbol: auditedWorkspaceCount == 0 ? "sparkles" : "checkmark.seal.fill",
+                        title: auditedWorkspaceCount == 0 ? "아직 검수된 지원서가 없어요" : "우선 확인할 문제가 없어요",
+                        message: auditedWorkspaceCount == 0
+                            ? "검수할 지원 항목을 선택하면 전체 우선순위가 여기에 모입니다."
+                            : "현재 전체 검수 결과에서 수정이 필요한 항목이 없습니다.",
+                        actionTitle: auditedWorkspaceCount == 0 ? "검수 목록" : nil,
+                        action: auditedWorkspaceCount == 0 ? { state.showAuditList() } : nil
                     )
                 } else {
-                    ForEach(Array(priorityFindings.enumerated()), id: \.element.id) { index, finding in
+                    ForEach(Array(priorityFindings.enumerated()), id: \.element.id) { index, item in
+                        let finding = item.finding
                         Button {
-                            state.selectedFindingID = finding.id
-                            state.destination = .audit
+                            state.showPortfolioFinding(item)
                         } label: {
                             HStack(alignment: .top, spacing: 13) {
                                 Image(systemName: finding.status.symbol)
@@ -209,6 +247,10 @@ struct OverviewView: View {
                                     .foregroundStyle(finding.status.color)
                                     .padding(.top, 2)
                                 VStack(alignment: .leading, spacing: 5) {
+                                    Text(item.workspaceTitle)
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(GCTheme.brand)
+                                        .lineLimit(1)
                                     HStack(spacing: 8) {
                                         Text(finding.category.rawValue)
                                             .font(.system(size: 10, weight: .bold))
@@ -245,50 +287,60 @@ struct OverviewView: View {
         }
     }
 
-    private var documentReadinessCard: some View {
+    private var portfolioReadinessCard: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    SectionTitle("지원 서류", eyebrow: "DOCUMENTS")
+                    SectionTitle("전체 지원 현황", eyebrow: "APPLICATIONS")
                     Spacer()
-                    Text("\(state.readyDocumentCount) / \(state.requiredDocumentCount)")
+                    Text("\(state.portfolioReadyDocumentCount) / \(state.portfolioRequiredDocumentCount)")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundStyle(GCTheme.brand)
                 }
-                if state.requiredDocumentTypes.isEmpty {
-                    Text("모집요강을 추가하면 필요 서류가 여기에 표시됩니다.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                } else {
-                    VStack(spacing: 7) {
-                        ForEach(state.requiredDocumentTypes.prefix(5)) { type in
-                            let ready = state.readyCount(for: type)
-                            let required = state.requiredCount(for: type)
+
+                VStack(spacing: 7) {
+                    ForEach(summaries.prefix(5)) { item in
+                        let isReady = item.requiredDocumentCount > 0
+                            && item.readyDocumentCount >= item.requiredDocumentCount
+                        Button {
+                            state.showWorkspaceDocuments(item.id)
+                        } label: {
                             HStack(spacing: 9) {
-                                Image(systemName: ready >= required ? "checkmark.circle.fill" : type.symbol)
+                                Image(systemName: isReady ? "checkmark.circle.fill" : "doc.circle")
                                     .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(ready >= required ? ReviewStatus.ready.color : Color.secondary)
+                                    .foregroundStyle(isReady ? ReviewStatus.ready.color : Color.secondary)
                                     .frame(width: 20)
-                                Text(type.shortTitle)
-                                    .font(.system(size: 10, weight: .semibold))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.workspace.school)
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(GCTheme.ink)
+                                        .lineLimit(1)
+                                    Text(item.workspace.program)
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
                                 Spacer()
-                                Text("\(ready)/\(required)")
+                                Text("\(item.readyDocumentCount)/\(item.requiredDocumentCount)")
                                     .font(.system(size: 9, weight: .bold, design: .rounded))
-                                    .foregroundStyle(ready >= required ? ReviewStatus.ready.color : .secondary)
+                                    .foregroundStyle(isReady ? ReviewStatus.ready.color : .secondary)
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 8)
-                            .background(ready >= required ? ReviewStatus.ready.color.opacity(0.07) : Color.black.opacity(0.025))
+                            .background(isReady ? ReviewStatus.ready.color.opacity(0.07) : Color.black.opacity(0.025))
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .contentShape(Rectangle())
                         }
-                        if state.requiredDocumentTypes.count > 5 {
-                            Text("외 \(state.requiredDocumentTypes.count - 5)개 유형")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        }
+                        .buttonStyle(.plain)
+                    }
+                    if summaries.count > 5 {
+                        Text("외 \(summaries.count - 5)개 지원 항목")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                Button("서류 관리") { state.showSelectedWorkspaceDocuments() }
+
+                Button("전체 지원 목록") { state.showWorkspaceList() }
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }

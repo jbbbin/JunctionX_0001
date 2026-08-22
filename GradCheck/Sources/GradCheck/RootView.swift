@@ -60,7 +60,8 @@ struct RootView: View {
         switch state.destination {
         case .documents: state.documentsRoute == .detail
         case .audit: state.auditRoute == .detail
-        case .overview, .requirements: true
+        case .overview: false
+        case .requirements: true
         }
     }
 
