@@ -245,9 +245,6 @@ struct WorkspaceSelectionView: View {
 
                         Spacer(minLength: 18)
                         WorkspaceBadge(status: workspace.status)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.tertiary)
                     }
                     .padding(.leading, 18)
                     .padding(.vertical, 16)
