@@ -127,112 +127,114 @@ struct NewWorkspaceSheet: View {
     }
 
     private var requirementsStep: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "building.columns.fill")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(GCTheme.brand)
-                    .frame(width: 46, height: 46)
-                    .background(GCTheme.brandSoft)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("공식 모집요강을 추가하세요")
-                        .font(.system(size: 16, weight: .bold))
-                    Text("대학원 공통 안내와 학과·프로그램 안내를 함께 넣을 수 있습니다. 각 파일의 출처와 페이지를 유지해 요건을 구조화합니다.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: "building.columns.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(GCTheme.brand)
+                        .frame(width: 46, height: 46)
+                        .background(GCTheme.brandSoft)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("공식 모집요강을 추가하세요")
+                            .font(.system(size: 16, weight: .bold))
+                        Text("대학원 공통 안내와 학과·프로그램 안내를 함께 넣을 수 있습니다. 각 파일의 출처와 페이지를 유지해 요건을 구조화합니다.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Button {
+                        showImporter = true
+                    } label: {
+                        Label("파일 선택", systemImage: "doc.badge.plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(GCTheme.brand)
+                    .disabled(model.isAnalyzing)
                 }
-                Spacer()
-                Button {
-                    showImporter = true
-                } label: {
-                    Label("파일 선택", systemImage: "doc.badge.plus")
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(GCTheme.brand)
-                .disabled(model.isAnalyzing)
-            }
 
-            SurfaceCard(padding: 0) {
-                if model.requirementURLs.isEmpty {
-                    EmptyStateView(
-                        symbol: "doc.text.magnifyingglass",
-                        title: "아직 모집요강이 없어요",
-                        message: "대학원 공통 안내와 프로그램 안내 PDF를 여러 개 선택할 수 있습니다.",
-                        actionTitle: "모집요강 선택",
-                        action: { showImporter = true }
-                    )
-                    .padding(24)
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(Array(model.requirementURLs.enumerated()), id: \.element) { index, url in
-                            HStack(spacing: 12) {
-                                Image(systemName: "doc.fill")
-                                    .foregroundStyle(GCTheme.brand)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(url.lastPathComponent)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .lineLimit(1)
-                                    Text(index == 0 ? "공식 출처 문서" : "추가 공식 출처")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
+                SurfaceCard(padding: 0) {
+                    if model.requirementURLs.isEmpty {
+                        EmptyStateView(
+                            symbol: "doc.text.magnifyingglass",
+                            title: "아직 모집요강이 없어요",
+                            message: "대학원 공통 안내와 프로그램 안내 PDF를 여러 개 선택할 수 있습니다.",
+                            actionTitle: "모집요강 선택",
+                            action: { showImporter = true }
+                        )
+                        .padding(24)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(model.requirementURLs.enumerated()), id: \.element) { index, url in
+                                HStack(spacing: 12) {
+                                    Image(systemName: "doc.fill")
+                                        .foregroundStyle(GCTheme.brand)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(url.lastPathComponent)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .lineLimit(1)
+                                        Text(index == 0 ? "공식 출처 문서" : "추가 공식 출처")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Button {
+                                        model.removeRequirementURL(url)
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                Spacer()
-                                Button {
-                                    model.removeRequirementURL(url)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 14)
+                                if index < model.requirementURLs.count - 1 { Divider().padding(.leading, 48) }
                             }
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 14)
-                            if index < model.requirementURLs.count - 1 { Divider().padding(.leading, 48) }
                         }
                     }
                 }
-            }
 
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Upstage API Key")
-                        .font(.system(size: 12, weight: .bold))
-                    Spacer()
-                    if model.hasUpstageAPIKey {
-                        Label("이 Mac에 저장됨", systemImage: "key.fill")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(ReviewStatus.ready.color)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Upstage API Key")
+                            .font(.system(size: 12, weight: .bold))
+                        Spacer()
+                        if model.hasUpstageAPIKey {
+                            Label("이 Mac에 저장됨", systemImage: "key.fill")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(ReviewStatus.ready.color)
+                        }
                     }
-                }
-                SecureField("up_...", text: $model.upstageAPIKey)
-                    .textFieldStyle(.roundedBorder)
-                Text(model.hasUpstageAPIKey
-                     ? "새 키를 입력하면 기존 키를 교체합니다. 입력하지 않으면 저장된 키를 사용합니다."
-                     : "입력한 키는 프로젝트 파일이 아니라 이 Mac의 Keychain에 저장됩니다.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(14)
-            .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            HStack(alignment: .top, spacing: 11) {
-                Image(systemName: model.isUpstageConnected ? "network.badge.shield.half.filled" : "lock.macwindow")
-                    .foregroundStyle(GCTheme.brand)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(model.providerLabel)
-                        .font(.system(size: 11, weight: .semibold))
-                    Text(model.isUpstageConnected
-                         ? "네 Upstage Studio 모집요강 Agent가 PDF를 Parse · Classify · Extract합니다."
-                         : "Agent를 실행하려면 up_로 시작하는 Upstage API 키를 입력해 주세요.")
+                    SecureField("up_...", text: $model.upstageAPIKey)
+                        .textFieldStyle(.roundedBorder)
+                    Text(model.hasUpstageAPIKey
+                         ? "새 키를 입력하면 기존 키를 교체합니다. 입력하지 않으면 저장된 키를 사용합니다."
+                         : "입력한 키는 프로젝트 파일이 아니라 이 Mac의 Keychain에 저장됩니다.")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
+                .padding(14)
+                .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                HStack(alignment: .top, spacing: 11) {
+                    Image(systemName: model.isUpstageConnected ? "network.badge.shield.half.filled" : "lock.macwindow")
+                        .foregroundStyle(GCTheme.brand)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(model.providerLabel)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(model.isUpstageConnected
+                             ? "네 Upstage Studio 모집요강 Agent가 PDF를 Parse · Classify · Extract합니다."
+                             : "Agent를 실행하려면 up_로 시작하는 Upstage API 키를 입력해 주세요.")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
-            Spacer()
+            .padding(28)
         }
-        .padding(28)
+        .scrollIndicators(.automatic)
     }
 
     private var reviewStep: some View {
