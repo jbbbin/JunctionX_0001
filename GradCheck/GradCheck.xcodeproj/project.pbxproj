@@ -29,6 +29,8 @@
 		F10000000000000000000014 /* AppDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000014 /* AppDependencies.swift */; };
 		F10000000000000000000015 /* NewWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000015 /* NewWorkspaceViewModel.swift */; };
 		F10000000000000000000016 /* StudioAgentRequirementsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000016 /* StudioAgentRequirementsService.swift */; };
+		F10000000000000000000017 /* ApplicantProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000017 /* ApplicantProfile.swift */; };
+		F10000000000000000000018 /* ApplicantIdentityAgentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000018 /* ApplicantIdentityAgentService.swift */; };
 		E10000000000000000000001 /* AppViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* AppViewModelTests.swift */; };
 		E10000000000000000000002 /* AuditEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* AuditEngineTests.swift */; };
 		E10000000000000000000003 /* DocumentPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* DocumentPipelineTests.swift */; };
@@ -70,6 +72,8 @@
 		F20000000000000000000014 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
 		F20000000000000000000015 /* NewWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewWorkspaceViewModel.swift; sourceTree = "<group>"; };
 		F20000000000000000000016 /* StudioAgentRequirementsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioAgentRequirementsService.swift; sourceTree = "<group>"; };
+		F20000000000000000000017 /* ApplicantProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicantProfile.swift; sourceTree = "<group>"; };
+		F20000000000000000000018 /* ApplicantIdentityAgentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicantIdentityAgentService.swift; sourceTree = "<group>"; };
 		E20000000000000000000001 /* AppViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModelTests.swift; sourceTree = "<group>"; };
 		E20000000000000000000002 /* AuditEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditEngineTests.swift; sourceTree = "<group>"; };
 		E20000000000000000000003 /* DocumentPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPipelineTests.swift; sourceTree = "<group>"; };
@@ -134,6 +138,8 @@
 		A30000000000000000000004 /* GradCheck */ = {
 			isa = PBXGroup;
 			children = (
+				F20000000000000000000017 /* ApplicantProfile.swift */,
+				F20000000000000000000018 /* ApplicantIdentityAgentService.swift */,
 				F20000000000000000000014 /* AppDependencies.swift */,
 				F20000000000000000000001 /* AppViewModel.swift */,
 				F20000000000000000000013 /* ApplicationStore.swift */,
@@ -288,6 +294,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F10000000000000000000017 /* ApplicantProfile.swift in Sources */,
+				F10000000000000000000018 /* ApplicantIdentityAgentService.swift in Sources */,
 				F10000000000000000000014 /* AppDependencies.swift in Sources */,
 				F10000000000000000000001 /* AppViewModel.swift in Sources */,
 				F10000000000000000000013 /* ApplicationStore.swift in Sources */,

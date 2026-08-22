@@ -256,10 +256,10 @@ struct SidebarView: View {
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("김민준")
+                Text(ApplicantProfile.current.displayName)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(GCTheme.secondaryInk)
-                Text("minjan.kim@example.com")
+                Text(ApplicantProfile.current.email)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
             }

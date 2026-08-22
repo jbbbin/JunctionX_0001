@@ -16,6 +16,7 @@ final class AppViewModel: ObservableObject {
     private let documentAnalyzer: any DocumentAnalyzing
     private let requirementsAnalyzer: any RequirementsAnalyzing
     private let graduateRequirementsAnalyzer: any GraduateRequirementsAnalyzing
+    private let applicantIdentityAnalyzer: any ApplicantIdentityAnalyzing
     private let apiKeyStore: any UpstageAPIKeyStoring
     private let auditor: any ApplicationAuditing
     private let repository: any ApplicationRepository
@@ -35,6 +36,7 @@ final class AppViewModel: ObservableObject {
         documentAnalyzer = dependencies.documentAnalyzer
         requirementsAnalyzer = dependencies.requirementsAnalyzer
         graduateRequirementsAnalyzer = dependencies.graduateRequirementsAnalyzer
+        applicantIdentityAnalyzer = dependencies.applicantIdentityAnalyzer
         apiKeyStore = dependencies.apiKeyStore
         auditor = dependencies.auditor
         repository = dependencies.repository
@@ -362,16 +364,25 @@ final class AppViewModel: ObservableObject {
 
                 do {
                     var agentRequirements: [RequirementItem]?
+                    var identityExtraction: ApplicantIdentityExtraction?
                     if provisionalType == .requirements, self.graduateRequirementsAnalyzer.hasAPIKey {
                         agentRequirements = try await self.graduateRequirementsAnalyzer.analyze(urls: [url])
+                    }
+                    if provisionalType.isApplicantDocument, self.applicantIdentityAnalyzer.hasAPIKey {
+                        identityExtraction = try? await self.applicantIdentityAnalyzer.analyze(url: url)
                     }
 
                     let extraction: ExtractedDocument
                     do {
                         extraction = try await self.documentAnalyzer.extract(from: url)
                     } catch {
-                        guard agentRequirements != nil else { throw error }
-                        extraction = self.agentBackedExtraction(for: url)
+                        if agentRequirements != nil {
+                            extraction = self.agentBackedExtraction(for: url)
+                        } else if identityExtraction != nil {
+                            extraction = self.identityAgentBackedExtraction(for: url)
+                        } else {
+                            throw error
+                        }
                     }
                     guard !Task.isCancelled,
                           self.selectedWorkspaceID == workspaceID,
@@ -385,12 +396,18 @@ final class AppViewModel: ObservableObject {
                        self.graduateRequirementsAnalyzer.hasAPIKey {
                         agentRequirements = try await self.graduateRequirementsAnalyzer.analyze(urls: [url])
                     }
+                    if finalType.isApplicantDocument,
+                       identityExtraction == nil,
+                       self.applicantIdentityAnalyzer.hasAPIKey {
+                        identityExtraction = try? await self.applicantIdentityAnalyzer.analyze(url: url)
+                    }
                     self.commitImportedDocument(
                         item.id,
                         workspaceID: workspaceID,
                         as: finalType,
                         extraction: extraction,
-                        requirements: agentRequirements
+                        requirements: agentRequirements,
+                        identityExtraction: identityExtraction
                     )
                     importedTypes.append(finalType)
                 } catch {
@@ -399,6 +416,7 @@ final class AppViewModel: ObservableObject {
                     self.updateSession(id: workspaceID) { session in
                         session.documents.removeAll { $0.id == item.id }
                         session.extractedDocuments.removeValue(forKey: item.id)
+                        session.identityExtractions.removeValue(forKey: item.id)
                     }
                     self.errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 }
@@ -419,6 +437,7 @@ final class AppViewModel: ObservableObject {
         updateSelectedSession { session in
             session.documents.removeAll { $0.id == document.id }
             session.extractedDocuments.removeValue(forKey: document.id)
+            session.identityExtractions.removeValue(forKey: document.id)
             if document.type == .requirements {
                 session.requirements.removeAll { sameFilename($0.sourceName, document.filename) }
             }
@@ -482,7 +501,8 @@ final class AppViewModel: ObservableObject {
                 for: session.workspace,
                 documents: session.documents,
                 extracted: session.extractedDocuments,
-                requirements: session.requirements
+                requirements: session.requirements,
+                identityExtractions: session.identityExtractions
             )
             guard !Task.isCancelled,
                   self.selectedWorkspaceID == workspaceID,
@@ -571,7 +591,8 @@ final class AppViewModel: ObservableObject {
         workspaceID: UUID,
         as type: DocumentType,
         extraction: ExtractedDocument,
-        requirements agentRequirements: [RequirementItem]? = nil
+        requirements agentRequirements: [RequirementItem]? = nil,
+        identityExtraction: ApplicantIdentityExtraction? = nil
     ) {
         updateSession(id: workspaceID) { session in
             guard let item = session.documents.first(where: { $0.id == id }) else { return }
@@ -592,11 +613,17 @@ final class AppViewModel: ObservableObject {
 
             session.documents.removeAll { replacedIDs.contains($0.id) }
             replacedIDs.forEach { session.extractedDocuments.removeValue(forKey: $0) }
+            replacedIDs.forEach { session.identityExtractions.removeValue(forKey: $0) }
             guard let index = session.documents.firstIndex(where: { $0.id == id }) else { return }
             session.documents[index].type = type
             session.documents[index].pageCount = extraction.pageCount
             session.documents[index].processingStatus = .ready
             session.extractedDocuments[id] = extraction
+            if let identityExtraction {
+                session.identityExtractions[id] = identityExtraction
+            } else {
+                session.identityExtractions.removeValue(forKey: id)
+            }
 
             if type == .requirements {
                 session.requirements.removeAll { sameFilename($0.sourceName, item.filename) }
@@ -617,6 +644,14 @@ final class AppViewModel: ObservableObject {
         ExtractedDocument(
             pages: ["이 모집요강은 Upstage Studio Agent가 직접 분석했습니다."],
             provider: graduateRequirementsAnalyzer.providerLabel,
+            sourcePageNumbers: [nil]
+        )
+    }
+
+    private func identityAgentBackedExtraction(for url: URL) -> ExtractedDocument {
+        ExtractedDocument(
+            pages: ["이 지원 서류는 Upstage Studio 신원 검증 Agent가 직접 분석했습니다."],
+            provider: applicantIdentityAnalyzer.providerLabel,
             sourcePageNumbers: [nil]
         )
     }
@@ -723,7 +758,8 @@ final class AppViewModel: ObservableObject {
                 for: workspace,
                 documents: documents,
                 extracted: extractions,
-                requirements: DemoData.requirements
+                requirements: DemoData.requirements,
+                identityExtractions: [:]
             )
         } else {
             workspace.status = .preparing

@@ -53,6 +53,9 @@ struct ApplicationSession: Identifiable {
     var requirements: [RequirementItem]
     var history: [AuditHistoryEntry]
     var extractedDocuments: [UUID: ExtractedDocument]
+    /// Agent-derived personal data is intentionally in-memory only and is not
+    /// written to ApplicationSessionSnapshot.
+    var identityExtractions: [UUID: ApplicantIdentityExtraction] = [:]
 
     var id: UUID { workspace.id }
 

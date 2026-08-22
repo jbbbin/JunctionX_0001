@@ -5,6 +5,7 @@ import Security
 /// here rather than scattering IDs throughout the UI and analysis code.
 enum StudioAgentPurpose: String, Sendable {
     case graduateRequirements
+    case applicantIdentity
     case applicationPackageAudit
 }
 
@@ -24,6 +25,13 @@ enum StudioAgentCatalog {
                 agentID: "agt_9yuURkpPwpUh6UzJEp5dCA",
                 configID: "6",
                 displayName: "미국 대학원 모집요강 Agent"
+            )
+        case .applicantIdentity:
+            StudioAgentConfiguration(
+                purpose: .applicantIdentity,
+                agentID: "agt_3cdAfCvWFyKwDeS6tCw9vJ",
+                configID: "3",
+                displayName: "지원자 신원 검증 Agent"
             )
         case .applicationPackageAudit:
             // Add its Agent ID and Config ID here when the package-audit Agent exists.

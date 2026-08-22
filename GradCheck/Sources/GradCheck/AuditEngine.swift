@@ -8,7 +8,8 @@ struct AuditEngine {
         for workspace: ApplicationWorkspace,
         documents: [DocumentItem],
         extracted: [UUID: ExtractedDocument],
-        requirements: [RequirementItem] = []
+        requirements: [RequirementItem] = [],
+        identityExtractions: [UUID: ApplicantIdentityExtraction] = [:]
     ) -> [AuditFinding] {
         let facts = documents.compactMap { document -> DocumentFacts? in
             guard let content = extracted[document.id] else { return nil }
@@ -17,7 +18,12 @@ struct AuditEngine {
 
         var results = completenessFindings(documents: documents, requirements: requirements)
         results.append(contentsOf: targetFindings(workspace: workspace, facts: facts))
-        results.append(contentsOf: identityFindings(workspace: workspace, facts: facts))
+        results.append(contentsOf: identityFindings(
+            workspace: workspace,
+            facts: facts,
+            documents: documents,
+            identityExtractions: identityExtractions
+        ))
         results.append(contentsOf: educationFindings(facts: facts))
         results.append(contentsOf: scoreFindings(facts: facts))
         results.append(contentsOf: requirementConstraintFindings(requirements: requirements, documents: documents, extracted: extracted))
@@ -239,26 +245,45 @@ struct AuditEngine {
         return findings
     }
 
-    private func identityFindings(workspace: ApplicationWorkspace, facts: [DocumentFacts]) -> [AuditFinding] {
+    private func identityFindings(
+        workspace: ApplicationWorkspace,
+        facts: [DocumentFacts],
+        documents: [DocumentItem],
+        identityExtractions: [UUID: ApplicantIdentityExtraction]
+    ) -> [AuditFinding] {
         let identityTypes: Set<DocumentType> = [
             .cv, .sop, .transcript, .englishScore, .degreeCertificate, .passportVisa
         ]
         let coreFacts = facts.filter { identityTypes.contains($0.document.type) }
-        let names = coreFacts.compactMap { $0.names.first }
+        let agentNames = agentIdentityFacts(
+            documents: documents,
+            extractions: identityExtractions,
+            value: \.fullName,
+            page: \.namePage,
+            evidence: \.nameEvidence,
+            label: "Agent 추출 이름"
+        )
+        let agentDocumentIDsWithName = Set(agentNames.map(\.documentName))
+        let names = agentNames + coreFacts
+            .filter { !agentDocumentIDsWithName.contains($0.document.filename) }
+            .compactMap { $0.names.first }
         var findings: [AuditFinding] = []
+        let expectedName = workspace.isSample && !workspace.applicantName.isEmpty
+            ? workspace.applicantName
+            : ApplicantProfile.current.legalName
+        let profileNameEvidence = profileEvidence(value: expectedName, label: "앱 사용자 기준 이름")
 
-        if names.count >= 2 {
-            let referenceName = workspace.applicantName.isEmpty ? names[0].value : workspace.applicantName
-            let comparisons = names.map { extractor.nameComparison(referenceName, $0.value) }
+        if !names.isEmpty {
+            let comparisons = names.map { extractor.nameComparison(expectedName, $0.value) }
             if comparisons.contains(where: { $0 == .different }) {
                 findings.append(
                     AuditFinding(
                         status: .blocked,
                         category: .identity,
-                        title: "영문 이름이 문서마다 일치하지 않아요",
-                        summary: "지원자 이름으로 확정하기 어려운 서로 다른 표기가 발견되었습니다.",
-                        action: "여권의 영문 이름을 기준으로 원서와 모든 지원 서류를 확인하세요.",
-                        evidences: names.map { $0.evidence(label: "\($0.documentType.shortTitle) 이름") }
+                        title: "문서의 영문 이름이 앱 사용자 정보와 달라요",
+                        summary: "앱 기준 이름(\(expectedName))과 다른 이름 표기가 발견되었습니다.",
+                        action: "여권 영문 이름을 기준으로 원서와 모든 지원 서류의 이름을 수정하세요.",
+                        evidences: [profileNameEvidence] + names.map { $0.evidence(label: "\($0.documentType.shortTitle) 이름") }
                     )
                 )
             } else if comparisons.contains(where: { $0 == .plausible }) {
@@ -267,9 +292,9 @@ struct AuditEngine {
                         status: .humanReview,
                         category: .identity,
                         title: "영문 이름의 순서와 띄어쓰기를 확인해 주세요",
-                        summary: "같은 이름일 가능성이 있지만 성·이름 순서 또는 음절 띄어쓰기가 다릅니다.",
+                        summary: "앱 기준 이름과 같은 사람일 가능성은 있지만 성·이름 순서 또는 음절 띄어쓰기가 다릅니다.",
                         action: "여권 표기와 각 지원 서류의 이름이 허용되는 형식인지 직접 확인하세요.",
-                        evidences: names.map { $0.evidence(label: "\($0.documentType.shortTitle) 이름") }
+                        evidences: [profileNameEvidence] + names.map { $0.evidence(label: "\($0.documentType.shortTitle) 이름") }
                     )
                 )
             } else {
@@ -277,10 +302,10 @@ struct AuditEngine {
                     AuditFinding(
                         status: .ready,
                         category: .identity,
-                        title: "영문 이름이 문서에서 일치해요",
-                        summary: "두 개 이상의 핵심 문서에서 같은 영문 이름을 확인했습니다.",
+                        title: "영문 이름이 앱 사용자 정보와 일치해요",
+                        summary: "업로드된 문서에서 앱 기준 영문 이름을 확인했습니다.",
                         action: "여권 원본과도 최종 대조하세요.",
-                        evidences: names.map { $0.evidence(label: "\($0.documentType.shortTitle) 이름") }
+                        evidences: [profileNameEvidence] + names.map { $0.evidence(label: "\($0.documentType.shortTitle) 이름") }
                     )
                 )
             }
@@ -327,6 +352,40 @@ struct AuditEngine {
             }
         }
 
+        if !workspace.isSample {
+            let emails = agentIdentityFacts(
+                documents: documents,
+                extractions: identityExtractions,
+                value: \.email,
+                page: \.emailPage,
+                evidence: \.emailEvidence,
+                label: "Agent 추출 이메일"
+            )
+            if !emails.isEmpty {
+                let expectedEmail = ApplicantProfile.current.email
+                let isMismatch = emails.contains {
+                    normalizedEmail($0.value) != normalizedEmail(expectedEmail)
+                }
+                findings.append(
+                    AuditFinding(
+                        status: isMismatch ? .blocked : .ready,
+                        category: .identity,
+                        title: isMismatch
+                            ? "문서의 이메일이 앱 사용자 정보와 달라요"
+                            : "이메일이 앱 사용자 정보와 일치해요",
+                        summary: isMismatch
+                            ? "앱 기준 이메일(\(expectedEmail))과 다른 이메일 표기가 발견되었습니다."
+                            : "업로드된 문서에서 앱 기준 이메일을 확인했습니다.",
+                        action: isMismatch
+                            ? "원서와 제출 서류의 이메일을 앱 사용자 정보 기준으로 수정하세요."
+                            : "추가 조치가 필요하지 않습니다.",
+                        evidences: [profileEvidence(value: expectedEmail, label: "앱 사용자 기준 이메일")]
+                            + emails.map { $0.evidence(label: "\($0.documentType.shortTitle) 이메일") }
+                    )
+                )
+            }
+        }
+
         let birthDates = facts.flatMap(\.birthDates)
         if birthDates.count >= 2 {
             let uniqueDates = Set(birthDates.map(\.normalized))
@@ -367,6 +426,45 @@ struct AuditEngine {
             )
         }
         return findings
+    }
+
+    private func agentIdentityFacts(
+        documents: [DocumentItem],
+        extractions: [UUID: ApplicantIdentityExtraction],
+        value: KeyPath<ApplicantIdentityExtraction, String?>,
+        page: KeyPath<ApplicantIdentityExtraction, Int?>,
+        evidence: KeyPath<ApplicantIdentityExtraction, String?>,
+        label: String
+    ) -> [ObservedFact] {
+        let supportedTypes: Set<DocumentType> = [.cv, .sop, .transcript, .englishScore, .degreeCertificate, .passportVisa]
+        return documents.compactMap { document in
+            guard supportedTypes.contains(document.type),
+                  let extraction = extractions[document.id],
+                  let rawValue = extraction[keyPath: value]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !rawValue.isEmpty
+            else { return nil }
+            return ObservedFact(
+                value: rawValue,
+                normalized: label.contains("이메일") ? normalizedEmail(rawValue) : extractor.normalizeName(rawValue),
+                documentName: document.filename,
+                documentType: document.type,
+                page: extraction[keyPath: page],
+                excerpt: extraction[keyPath: evidence] ?? rawValue
+            )
+        }
+    }
+
+    private func profileEvidence(value: String, label: String) -> EvidenceRef {
+        EvidenceRef(
+            documentName: "앱 사용자 프로필",
+            documentType: .other,
+            excerpt: value,
+            fieldLabel: label
+        )
+    }
+
+    private func normalizedEmail(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private func educationFindings(facts: [DocumentFacts]) -> [AuditFinding] {
