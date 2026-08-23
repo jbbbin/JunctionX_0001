@@ -312,7 +312,7 @@ enum DocumentProcessingStatus: String, Codable {
     var label: String {
         switch self {
         case .queued: "대기 중"
-        case .parsing: "문서 분석 중"
+        case .parsing: "업로드 중"
         case .ready: "분석 완료"
         case .failed: "확인 필요"
         }
