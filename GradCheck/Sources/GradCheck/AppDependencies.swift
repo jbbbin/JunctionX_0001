@@ -12,7 +12,8 @@ protocol ApplicationAuditing {
         documents: [DocumentItem],
         extracted: [UUID: ExtractedDocument],
         requirements: [RequirementItem],
-        identityExtractions: [UUID: ApplicantIdentityExtraction]
+        identityExtractions: [UUID: ApplicantIdentityExtraction],
+        documentValidations: [UUID: SubmissionDocumentValidation]
     ) -> [AuditFinding]
 }
 
@@ -23,6 +24,7 @@ struct AppDependencies {
     var requirementsAnalyzer: any RequirementsAnalyzing
     var graduateRequirementsAnalyzer: any GraduateRequirementsAnalyzing = UnavailableGraduateRequirementsAnalyzer()
     var applicantIdentityAnalyzer: any ApplicantIdentityAnalyzing = UnavailableApplicantIdentityAnalyzer()
+    var submissionDocumentValidator: any SubmissionDocumentValidating = UnavailableSubmissionDocumentValidator()
     var apiKeyStore: any UpstageAPIKeyStoring = EnvironmentThenKeychainAPIKeyStore()
     var auditor: any ApplicationAuditing
     var repository: any ApplicationRepository
@@ -40,6 +42,7 @@ struct AppDependencies {
                 apiKeyStore: apiKeyStore
             ),
             applicantIdentityAnalyzer: ApplicantIdentityAgentService(apiKeyStore: apiKeyStore),
+            submissionDocumentValidator: SubmissionDocumentValidationAgentService(apiKeyStore: apiKeyStore),
             apiKeyStore: apiKeyStore,
             auditor: AuditEngine(),
             repository: loadSavedState

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SidebarView: View {
@@ -233,13 +234,9 @@ struct SidebarView: View {
     
     private var brand: some View {
         HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(GCTheme.brand)
-                Image(systemName: "checkmark.shield.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
+            Image(nsImage: UpCheckIconAsset.logo)
+                .resizable()
+                .scaledToFit()
             .frame(width: 36, height: 36)
             VStack(alignment: .leading, spacing: 1) {
                 Text("UpCheck")
@@ -266,4 +263,14 @@ struct SidebarView: View {
             Spacer(minLength: 0)
         }
     }
+}
+
+private enum UpCheckIconAsset {
+    static let logo: NSImage = {
+        guard let url = Bundle.main.url(forResource: "UpCheckLogo", withExtension: "png"),
+              let image = NSImage(contentsOf: url) else {
+            return NSImage(systemSymbolName: "checkmark.shield.fill", accessibilityDescription: nil) ?? NSImage()
+        }
+        return image
+    }()
 }

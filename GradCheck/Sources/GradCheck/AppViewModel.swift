@@ -17,6 +17,7 @@ final class AppViewModel: ObservableObject {
     private let requirementsAnalyzer: any RequirementsAnalyzing
     private let graduateRequirementsAnalyzer: any GraduateRequirementsAnalyzing
     private let applicantIdentityAnalyzer: any ApplicantIdentityAnalyzing
+    private let submissionDocumentValidator: any SubmissionDocumentValidating
     private let apiKeyStore: any UpstageAPIKeyStoring
     private let auditor: any ApplicationAuditing
     private let repository: any ApplicationRepository
@@ -37,6 +38,7 @@ final class AppViewModel: ObservableObject {
         requirementsAnalyzer = dependencies.requirementsAnalyzer
         graduateRequirementsAnalyzer = dependencies.graduateRequirementsAnalyzer
         applicantIdentityAnalyzer = dependencies.applicantIdentityAnalyzer
+        submissionDocumentValidator = dependencies.submissionDocumentValidator
         apiKeyStore = dependencies.apiKeyStore
         auditor = dependencies.auditor
         repository = dependencies.repository
@@ -103,6 +105,8 @@ final class AppViewModel: ObservableObject {
 
     var providerLabel: String { graduateRequirementsAnalyzer.providerLabel }
     var isUpstageConnected: Bool { graduateRequirementsAnalyzer.hasAPIKey }
+    var submissionDocumentProviderLabel: String { submissionDocumentValidator.providerLabel }
+    var isSubmissionDocumentAgentConnected: Bool { submissionDocumentValidator.hasAPIKey }
     var hasStoredUpstageAPIKey: Bool { graduateRequirementsAnalyzer.hasAPIKey }
     var hasCurrentAudit: Bool {
         workspace.status != .preparing && !findings.isEmpty && workspace.lastAuditedAt != nil
@@ -312,7 +316,7 @@ final class AppViewModel: ObservableObject {
     func loadDemo() {
         cancelActiveImport()
         cancelActiveAudit()
-        let demo = Self.demoSession(noteDate: .now)
+        let demo = Self.demoSession()
         var updated = portfolio
         updated.upsert(demo, select: true)
         portfolio = updated
@@ -342,7 +346,7 @@ final class AppViewModel: ObservableObject {
                     self.importTask = nil
                 }
             }
-            var importedTypes: [DocumentType] = []
+            var importedFileCount = 0
             for url in urls {
                 guard !Task.isCancelled,
                       self.selectedWorkspaceID == workspaceID,
@@ -350,7 +354,10 @@ final class AppViewModel: ObservableObject {
                 let hasAccess = url.startAccessingSecurityScopedResource()
                 defer { if hasAccess { url.stopAccessingSecurityScopedResource() } }
 
-                let provisionalType = requestedType ?? DocumentType.infer(from: url.lastPathComponent)
+                // A free-form upload starts as `other`. When the separate
+                // Studio Agent is connected, the Agent — not the filename —
+                // decides its final document type.
+                let provisionalType = requestedType ?? .other
                 let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
                 let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
                 let item = DocumentItem(
@@ -365,11 +372,16 @@ final class AppViewModel: ObservableObject {
                 do {
                     var agentRequirements: [RequirementItem]?
                     var identityExtraction: ApplicantIdentityExtraction?
+                    var documentValidation: SubmissionDocumentValidation?
                     if provisionalType == .requirements, self.graduateRequirementsAnalyzer.hasAPIKey {
                         agentRequirements = try await self.graduateRequirementsAnalyzer.analyze(urls: [url])
                     }
-                    if provisionalType.isApplicantDocument, self.applicantIdentityAnalyzer.hasAPIKey {
-                        identityExtraction = try? await self.applicantIdentityAnalyzer.analyze(url: url)
+                    if provisionalType != .requirements {
+                        // A real submission file is accepted only after the
+                        // dedicated Studio Agent has produced its structured
+                        // classification. Do not silently fall back to the
+                        // filename or local keyword guesses.
+                        documentValidation = try await self.submissionDocumentValidator.analyze(url: url)
                     }
 
                     let extraction: ExtractedDocument
@@ -378,8 +390,8 @@ final class AppViewModel: ObservableObject {
                     } catch {
                         if agentRequirements != nil {
                             extraction = self.agentBackedExtraction(for: url)
-                        } else if identityExtraction != nil {
-                            extraction = self.identityAgentBackedExtraction(for: url)
+                        } else if documentValidation != nil {
+                            extraction = self.documentValidationBackedExtraction(for: url)
                         } else {
                             throw error
                         }
@@ -387,10 +399,17 @@ final class AppViewModel: ObservableObject {
                     guard !Task.isCancelled,
                           self.selectedWorkspaceID == workspaceID,
                           self.activeImportID == importID else { return }
-                    let finalType = requestedType ?? DocumentType.infer(
-                        from: item.filename,
-                        content: extraction.text
-                    )
+                    let finalType: DocumentType
+                    if let requestedType {
+                        // Keep the expected UI slot so the audit can report a
+                        // mismatch instead of silently moving a wrong file.
+                        finalType = requestedType
+                    } else {
+                        // A free-form file always has a submission-document
+                        // Agent result here. An unknown type remains `other`
+                        // and becomes a human-review finding in the report.
+                        finalType = documentValidation?.detectedDocumentType ?? .other
+                    }
                     if finalType == .requirements,
                        agentRequirements == nil,
                        self.graduateRequirementsAnalyzer.hasAPIKey {
@@ -407,9 +426,10 @@ final class AppViewModel: ObservableObject {
                         as: finalType,
                         extraction: extraction,
                         requirements: agentRequirements,
-                        identityExtraction: identityExtraction
+                        identityExtraction: identityExtraction,
+                        documentValidation: documentValidation
                     )
-                    importedTypes.append(finalType)
+                    importedFileCount += 1
                 } catch {
                     guard self.selectedWorkspaceID == workspaceID,
                           self.activeImportID == importID else { return }
@@ -417,15 +437,15 @@ final class AppViewModel: ObservableObject {
                         session.documents.removeAll { $0.id == item.id }
                         session.extractedDocuments.removeValue(forKey: item.id)
                         session.identityExtractions.removeValue(forKey: item.id)
+                        session.documentValidations.removeValue(forKey: item.id)
                     }
                     self.errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 }
             }
 
             self.persist()
-            if self.errorMessage == nil, !importedTypes.isEmpty {
-                let names = importedTypes.map(\.shortTitle).joined(separator: ", ")
-                self.successMessage = "\(names) 파일을 분석했어요. 재검수를 실행해 주세요."
+            if self.errorMessage == nil, importedFileCount > 0 {
+                self.successMessage = "\(importedFileCount)개 파일을 업로드했어요. 검수 리포트에서 Agent 근거를 확인하세요."
                 self.dismissSuccessMessageLater()
             }
         }
@@ -438,6 +458,7 @@ final class AppViewModel: ObservableObject {
             session.documents.removeAll { $0.id == document.id }
             session.extractedDocuments.removeValue(forKey: document.id)
             session.identityExtractions.removeValue(forKey: document.id)
+            session.documentValidations.removeValue(forKey: document.id)
             if document.type == .requirements {
                 session.requirements.removeAll { sameFilename($0.sourceName, document.filename) }
             }
@@ -453,6 +474,7 @@ final class AppViewModel: ObservableObject {
             let oldIDs = session.documents.filter { $0.type == .sop }.map(\.id)
             session.documents.removeAll { $0.type == .sop }
             oldIDs.forEach { session.extractedDocuments.removeValue(forKey: $0) }
+            oldIDs.forEach { session.documentValidations.removeValue(forKey: $0) }
 
             let revised = DemoData.revisedSOPDocument()
             session.documents.append(revised)
@@ -502,7 +524,8 @@ final class AppViewModel: ObservableObject {
                 documents: session.documents,
                 extracted: session.extractedDocuments,
                 requirements: session.requirements,
-                identityExtractions: session.identityExtractions
+                identityExtractions: session.identityExtractions,
+                documentValidations: session.documentValidations
             )
             guard !Task.isCancelled,
                   self.selectedWorkspaceID == workspaceID,
@@ -592,7 +615,8 @@ final class AppViewModel: ObservableObject {
         as type: DocumentType,
         extraction: ExtractedDocument,
         requirements agentRequirements: [RequirementItem]? = nil,
-        identityExtraction: ApplicantIdentityExtraction? = nil
+        identityExtraction: ApplicantIdentityExtraction? = nil,
+        documentValidation: SubmissionDocumentValidation? = nil
     ) {
         updateSession(id: workspaceID) { session in
             guard let item = session.documents.first(where: { $0.id == id }) else { return }
@@ -614,6 +638,7 @@ final class AppViewModel: ObservableObject {
             session.documents.removeAll { replacedIDs.contains($0.id) }
             replacedIDs.forEach { session.extractedDocuments.removeValue(forKey: $0) }
             replacedIDs.forEach { session.identityExtractions.removeValue(forKey: $0) }
+            replacedIDs.forEach { session.documentValidations.removeValue(forKey: $0) }
             guard let index = session.documents.firstIndex(where: { $0.id == id }) else { return }
             session.documents[index].type = type
             session.documents[index].pageCount = extraction.pageCount
@@ -624,13 +649,15 @@ final class AppViewModel: ObservableObject {
             } else {
                 session.identityExtractions.removeValue(forKey: id)
             }
+            if let documentValidation {
+                session.documentValidations[id] = documentValidation
+            } else {
+                session.documentValidations.removeValue(forKey: id)
+            }
 
-            if type == .requirements {
+            if type == .requirements, let agentRequirements {
                 session.requirements.removeAll { sameFilename($0.sourceName, item.filename) }
-                session.requirements.append(contentsOf: agentRequirements ?? requirementsAnalyzer.extract(
-                    from: extraction,
-                    sourceName: item.filename
-                ))
+                session.requirements.append(contentsOf: agentRequirements)
             }
             invalidateAudit(&session)
         }
@@ -648,10 +675,10 @@ final class AppViewModel: ObservableObject {
         )
     }
 
-    private func identityAgentBackedExtraction(for url: URL) -> ExtractedDocument {
+    private func documentValidationBackedExtraction(for url: URL) -> ExtractedDocument {
         ExtractedDocument(
-            pages: ["이 지원 서류는 Upstage Studio 신원 검증 Agent가 직접 분석했습니다."],
-            provider: applicantIdentityAnalyzer.providerLabel,
+            pages: ["이 지원 서류는 Upstage Studio 제출 서류 검증 Agent가 직접 분석했습니다."],
+            provider: submissionDocumentValidator.providerLabel,
             sourcePageNumbers: [nil]
         )
     }
@@ -706,21 +733,19 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    private static func demoSession(noteDate: Date? = nil) -> ApplicationSession {
-        ApplicationSession(
-            workspace: DemoData.workspace,
+    private static func demoSession() -> ApplicationSession {
+        // Keep the starter workspace as a navigation example, but do not
+        // preload the old hand-authored audit cards. A report must be created
+        // from the active Studio Agents after the user runs a package audit.
+        var workspace = DemoData.workspace
+        workspace.status = .preparing
+        workspace.lastAuditedAt = nil
+        return ApplicationSession(
+            workspace: workspace,
             documents: DemoData.documents,
-            findings: DemoData.findings,
+            findings: [],
             requirements: DemoData.requirements,
-            history: [
-                AuditHistoryEntry(
-                    date: noteDate ?? DemoData.referenceDate.addingTimeInterval(-60 * 18),
-                    blockedCount: 2,
-                    reviewCount: 2,
-                    readyCount: 4,
-                    note: noteDate == nil ? "샘플 지원 패키지 최초 검수" : "샘플 지원 패키지 불러오기"
-                )
-            ],
+            history: [],
             extractedDocuments: DemoData.extractions(for: DemoData.documents)
         )
     }
@@ -759,7 +784,8 @@ final class AppViewModel: ObservableObject {
                 documents: documents,
                 extracted: extractions,
                 requirements: DemoData.requirements,
-                identityExtractions: [:]
+                identityExtractions: [:],
+                documentValidations: [:]
             )
         } else {
             workspace.status = .preparing

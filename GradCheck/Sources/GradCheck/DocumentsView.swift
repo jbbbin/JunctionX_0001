@@ -83,7 +83,7 @@ struct DocumentsView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text("\(state.readyDocumentCount) / \(state.requiredDocumentCount) 준비")
+                    Text("\(state.readyDocumentCount) / \(state.requiredDocumentCount) 업로드됨")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(state.readyDocumentCount == state.requiredDocumentCount ? ReviewStatus.ready.color : GCTheme.secondaryInk)
                         .padding(.horizontal, 10)
@@ -298,7 +298,7 @@ struct DocumentsView: View {
                 Text("여러 파일을 놓아도 돼요")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(isDropTargeted ? .white : GCTheme.ink)
-                Text("파일명과 내용을 기준으로 문서 유형을 분류합니다.")
+                Text("파일을 올린 뒤 검수 리포트에서 분석 근거를 확인하세요.")
                     .font(.system(size: 10))
                     .foregroundStyle(isDropTargeted ? .white.opacity(0.75) : .secondary)
             }
@@ -325,9 +325,9 @@ struct DocumentsView: View {
                 Text(state.providerLabel)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(GCTheme.ink)
-                Text(state.isUpstageConnected
-                     ? "모집요강은 Upstage Studio Agent가 구조화하고, 지원자 서류는 제출 목록과 대조합니다. API 키는 이 Mac의 Keychain에만 저장됩니다."
-                     : "모집요강 Agent를 실행하려면 새 지원 목표 단계에서 up_로 시작하는 Upstage API 키를 입력해 주세요.")
+                Text(state.isUpstageConnected && state.isSubmissionDocumentAgentConnected
+                     ? "제출 파일의 분석 근거와 검수 결과는 검수 리포트에서 확인할 수 있습니다. API 키는 이 Mac의 Keychain에만 저장됩니다."
+                     : "Upstage Studio Agent를 실행하려면 새 지원 목표 단계에서 Upstage API 키를 입력해 주세요.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -350,7 +350,9 @@ private struct DocumentSlotRow: View {
     @State private var targeted = false
 
     private var document: DocumentItem? { documents.first }
-    private var readyCount: Int { documents.filter { $0.processingStatus == .ready }.count }
+    private var readyCount: Int {
+        documents.filter { $0.processingStatus == .ready }.count
+    }
 
     var body: some View {
         HStack(spacing: 14) {
@@ -450,7 +452,10 @@ private struct DocumentSlotRow: View {
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(GCTheme.blue)
         case .ready:
-            Label(status.label, systemImage: "checkmark.circle.fill")
+            // The upload screen deliberately confirms only completion of the
+            // upload. The Agent's judgment and evidence belong in the audit
+            // report, not beside the document slot.
+            Label("업로드 완료", systemImage: "checkmark.circle.fill")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(ReviewStatus.ready.color)
         case .failed:
@@ -459,4 +464,5 @@ private struct DocumentSlotRow: View {
                 .foregroundStyle(ReviewStatus.humanReview.color)
         }
     }
+
 }

@@ -56,6 +56,10 @@ struct ApplicationSession: Identifiable {
     /// Agent-derived personal data is intentionally in-memory only and is not
     /// written to ApplicationSessionSnapshot.
     var identityExtractions: [UUID: ApplicantIdentityExtraction] = [:]
+    /// Per-file document-type results from the separate submission-document
+    /// Agent. Like identity data, this can contain personal information and is
+    /// intentionally not persisted in ApplicationSessionSnapshot.
+    var documentValidations: [UUID: SubmissionDocumentValidation] = [:]
 
     var id: UUID { workspace.id }
 
@@ -77,7 +81,9 @@ struct ApplicationSession: Identifiable {
 
     func readyCount(for type: DocumentType) -> Int {
         min(
-            documents.filter { $0.type == type && $0.processingStatus == .ready }.count,
+            documents.filter { document in
+                document.type == type && document.processingStatus == .ready
+            }.count,
             requiredCount(for: type)
         )
     }

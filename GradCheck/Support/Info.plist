@@ -6,6 +6,8 @@
     <string>ko</string>
     <key>CFBundleExecutable</key>
     <string>GradCheck</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.gradcheck.macos</string>
     <key>CFBundleInfoDictionaryVersion</key>

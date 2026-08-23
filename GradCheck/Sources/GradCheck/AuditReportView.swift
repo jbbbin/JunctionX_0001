@@ -355,6 +355,10 @@ private struct EvidenceCard: View {
     let evidence: EvidenceRef
     let status: ReviewStatus
 
+    private var isAgentEvidence: Bool {
+        evidence.fieldLabel.localizedCaseInsensitiveContains("Agent")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack(spacing: 9) {
@@ -383,7 +387,7 @@ private struct EvidenceCard: View {
                 .textSelection(.enabled)
             HStack(spacing: 5) {
                 Circle().fill(status.color).frame(width: 5, height: 5)
-                Text("문서에 명시된 내용")
+                Text(isAgentEvidence ? "Agent 분석 근거" : "문서에 명시된 내용")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
             }

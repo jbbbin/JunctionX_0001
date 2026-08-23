@@ -1,7 +1,6 @@
 import Foundation
 
 struct AuditEngine {
-    private let legacyCoreTypes: [DocumentType] = [.cv, .sop, .transcript, .englishScore]
     private let extractor = FactExtractor()
 
     func findings(
@@ -9,25 +8,28 @@ struct AuditEngine {
         documents: [DocumentItem],
         extracted: [UUID: ExtractedDocument],
         requirements: [RequirementItem] = [],
-        identityExtractions: [UUID: ApplicantIdentityExtraction] = [:]
+        identityExtractions: [UUID: ApplicantIdentityExtraction] = [:],
+        documentValidations: [UUID: SubmissionDocumentValidation] = [:]
     ) -> [AuditFinding] {
-        let facts = documents.compactMap { document -> DocumentFacts? in
-            guard let content = extracted[document.id] else { return nil }
-            return extractor.extract(document: document, content: content)
-        }
-
-        var results = completenessFindings(documents: documents, requirements: requirements)
-        results.append(contentsOf: targetFindings(workspace: workspace, facts: facts))
+        // The report intentionally uses only three evidence sources:
+        // 1. official requirements extracted by the requirements Agent,
+        // 2. name/email extracted by the identity Agent, and
+        // 3. document-type evidence extracted by the submission-document Agent.
+        // Do not mix in the earlier local keyword/regex inferences here.
+        var results = documentValidationFindings(
+            documents: documents,
+            documentValidations: documentValidations
+        )
+        results.append(contentsOf: completenessFindings(
+            documents: documents,
+            requirements: requirements,
+            documentValidations: documentValidations
+        ))
         results.append(contentsOf: identityFindings(
             workspace: workspace,
-            facts: facts,
             documents: documents,
             identityExtractions: identityExtractions
         ))
-        results.append(contentsOf: educationFindings(facts: facts))
-        results.append(contentsOf: scoreFindings(facts: facts))
-        results.append(contentsOf: requirementConstraintFindings(requirements: requirements, documents: documents, extracted: extracted))
-        results.append(contentsOf: verifiabilityFindings(documents: documents, extracted: extracted))
 
         return results.sorted { lhs, rhs in
             if lhs.status.rank == rhs.status.rank { return lhs.title < rhs.title }
@@ -37,17 +39,20 @@ struct AuditEngine {
 
     private func completenessFindings(
         documents: [DocumentItem],
-        requirements: [RequirementItem]
+        requirements: [RequirementItem],
+        documentValidations: [UUID: SubmissionDocumentValidation]
     ) -> [AuditFinding] {
-        let derivedTypes = RequirementAnalysisResult.requiredTypes(from: requirements)
-        let types = derivedTypes.isEmpty ? legacyCoreTypes : derivedTypes
+        let types = RequirementAnalysisResult.requiredTypes(from: requirements)
+        // A report must not invent a generic CV/SOP/transcript checklist when
+        // the requirements Agent did not return an uploadable requirement.
+        guard !types.isEmpty else { return [] }
         return types.map { type in
             let expectedCount = max(
                 RequirementAnalysisResult.requiredCount(for: type, in: requirements),
                 1
             )
-            let readyDocuments = documents.filter {
-                $0.type == type && $0.processingStatus == .ready
+            let readyDocuments = documents.filter { document in
+                isVerified(document, for: type, documentValidations: documentValidations)
             }
             let requirement = requirements.first {
                 $0.documentTypeForUpload == type && $0.effectiveNecessity != .informational
@@ -74,6 +79,16 @@ struct AuditEngine {
                         fieldLabel: "업로드 상태"
                     )
                 ]
+                evidences.append(contentsOf: readyDocuments.prefix(expectedCount).compactMap { readyDocument in
+                    guard let validation = documentValidations[readyDocument.id] else { return nil }
+                    return EvidenceRef(
+                        documentName: readyDocument.filename,
+                        documentType: type,
+                        page: validation.evidencePage,
+                        excerpt: validation.evidenceExcerpt,
+                        fieldLabel: "제출 서류 검증 Agent"
+                    )
+                })
                 if let requirementEvidence { evidences.append(requirementEvidence) }
                 return AuditFinding(
                     status: .ready,
@@ -82,7 +97,7 @@ struct AuditEngine {
                         ? "\(type.title) \(expectedCount)부를 확인했어요"
                         : "\(type.title) 파일을 확인했어요",
                     summary: "공식 모집요강에서 확인한 제출 수량만큼 분석 가능한 문서가 등록되어 있습니다.",
-                    action: "세부 사실 대조 결과를 확인하세요.",
+                    action: "추가 조치가 필요하지 않습니다.",
                     evidences: evidences
                 )
             }
@@ -95,6 +110,16 @@ struct AuditEngine {
                     fieldLabel: "업로드 상태"
                 )
             ]
+            evidences.append(contentsOf: readyDocuments.prefix(expectedCount).compactMap { readyDocument in
+                guard let validation = documentValidations[readyDocument.id] else { return nil }
+                return EvidenceRef(
+                    documentName: readyDocument.filename,
+                    documentType: type,
+                    page: validation.evidencePage,
+                    excerpt: validation.evidenceExcerpt,
+                    fieldLabel: "제출 서류 검증 Agent"
+                )
+            })
             if let requirementEvidence { evidences.append(requirementEvidence) }
             return AuditFinding(
                 status: isConditional ? .humanReview : .blocked,
@@ -111,6 +136,80 @@ struct AuditEngine {
                 evidences: evidences
             )
         }
+    }
+
+    /// Uses only the file-level Studio Agent result as the evidence for a
+    /// document-type mismatch. In particular, it does not infer a type from a
+    /// filename or from local keyword matching once an Agent result exists.
+    private func documentValidationFindings(
+        documents: [DocumentItem],
+        documentValidations: [UUID: SubmissionDocumentValidation]
+    ) -> [AuditFinding] {
+        documents.compactMap { document in
+            guard document.type != .requirements,
+                  document.processingStatus == .ready,
+                  let validation = documentValidations[document.id]
+            else { return nil }
+
+            let evidence = EvidenceRef(
+                documentName: document.filename,
+                documentType: document.type,
+                page: validation.evidencePage,
+                excerpt: validation.evidenceExcerpt,
+                fieldLabel: "제출 서류 검증 Agent"
+            )
+
+            guard let detected = validation.detectedDocumentType else {
+                return AuditFinding(
+                    status: .humanReview,
+                    category: .format,
+                    title: "문서 유형을 Agent가 확정하지 못했어요",
+                    summary: "이 파일이 \(document.type.title) 요구 항목에 맞는지 자동으로 확정하지 못했습니다.",
+                    action: "원문과 Agent 판단 근거를 확인한 뒤 올바른 제출 칸에 추가하세요.",
+                    evidences: [evidence]
+                )
+            }
+
+            if validation.requiresHumanReview {
+                return AuditFinding(
+                    status: .humanReview,
+                    category: .format,
+                    title: "\(document.type.title) 파일 유형을 직접 확인해 주세요",
+                    summary: "Agent가 \(detected.title)로 분류했지만 판정 신뢰도가 낮습니다.",
+                    action: "Agent 판단 근거와 원문 첫 페이지를 확인한 뒤 올바른 제출 칸에 두세요.",
+                    evidences: [evidence]
+                )
+            }
+
+            // A matching result is shown inside the normal requirement card,
+            // alongside its official requirement evidence, rather than as a
+            // separate noisy per-file success row.
+            guard detected != document.type else { return nil }
+            return AuditFinding(
+                status: .blocked,
+                category: .format,
+                title: "\(document.type.title) 칸의 문서 유형이 달라요",
+                summary: "제출 서류 검증 Agent는 이 파일을 \(detected.title)로 분류했습니다.",
+                action: "\(document.type.title) 파일을 추가하고, 이 파일은 \(detected.title) 제출 항목으로 옮기거나 교체하세요.",
+                evidences: [evidence]
+            )
+        }
+    }
+
+    private func isVerified(
+        _ document: DocumentItem,
+        for expectedType: DocumentType,
+        documentValidations: [UUID: SubmissionDocumentValidation]
+    ) -> Bool {
+        guard document.type == expectedType,
+              document.processingStatus == .ready
+        else { return false }
+        guard let validation = documentValidations[document.id] else {
+            // Demo documents remain runnable without a network call. Real
+            // documents must have a matching Agent result to count as ready.
+            return document.isSample
+        }
+        return validation.detectedDocumentType == expectedType && !validation.requiresHumanReview
     }
 
     private func targetFindings(workspace: ApplicationWorkspace, facts: [DocumentFacts]) -> [AuditFinding] {
@@ -247,15 +346,10 @@ struct AuditEngine {
 
     private func identityFindings(
         workspace: ApplicationWorkspace,
-        facts: [DocumentFacts],
         documents: [DocumentItem],
         identityExtractions: [UUID: ApplicantIdentityExtraction]
     ) -> [AuditFinding] {
-        let identityTypes: Set<DocumentType> = [
-            .cv, .sop, .transcript, .englishScore, .degreeCertificate, .passportVisa
-        ]
-        let coreFacts = facts.filter { identityTypes.contains($0.document.type) }
-        let agentNames = agentIdentityFacts(
+        let names = agentIdentityFacts(
             documents: documents,
             extractions: identityExtractions,
             value: \.fullName,
@@ -263,10 +357,6 @@ struct AuditEngine {
             evidence: \.nameEvidence,
             label: "Agent 추출 이름"
         )
-        let agentDocumentIDsWithName = Set(agentNames.map(\.documentName))
-        let names = agentNames + coreFacts
-            .filter { !agentDocumentIDsWithName.contains($0.document.filename) }
-            .compactMap { $0.names.first }
         var findings: [AuditFinding] = []
         let expectedName = workspace.isSample && !workspace.applicantName.isEmpty
             ? workspace.applicantName
@@ -309,49 +399,7 @@ struct AuditEngine {
                     )
                 )
             }
-        } else if coreFacts.count >= 2 {
-            findings.append(
-                AuditFinding(
-                    status: .humanReview,
-                    category: .identity,
-                    title: "영문 이름을 충분히 대조하지 못했어요",
-                    summary: "두 개 이상의 문서에서 이름 필드를 확실하게 추출하지 못했습니다.",
-                    action: "여권 기준 이름을 각 문서에서 직접 확인하세요.",
-                    evidences: coreFacts.map {
-                        EvidenceRef(
-                            documentName: $0.document.filename,
-                            documentType: $0.document.type,
-                            excerpt: "not_stated · 이름 자동 추출 불가",
-                            fieldLabel: "영문 이름"
-                        )
-                    }
-                )
-            )
         }
-
-        if names.count >= 2 {
-            let missingNameSources = coreFacts.filter { $0.names.isEmpty }
-            if !missingNameSources.isEmpty {
-                findings.append(
-                    AuditFinding(
-                        status: .humanReview,
-                        category: .identity,
-                        title: "일부 문서에서 영문 이름을 확인하지 못했어요",
-                        summary: "이름이 확인된 문서끼리는 대조했지만 모든 핵심 문서의 이름 표기를 검증하지는 못했습니다.",
-                        action: "여권 표기를 기준으로 이름이 추출되지 않은 문서를 직접 확인하세요.",
-                        evidences: missingNameSources.map {
-                            EvidenceRef(
-                                documentName: $0.document.filename,
-                                documentType: $0.document.type,
-                                excerpt: "not_stated · 이름 자동 추출 불가",
-                                fieldLabel: "영문 이름"
-                            )
-                        }
-                    )
-                )
-            }
-        }
-
         if !workspace.isSample {
             let emails = agentIdentityFacts(
                 documents: documents,
@@ -386,45 +434,6 @@ struct AuditEngine {
             }
         }
 
-        let birthDates = facts.flatMap(\.birthDates)
-        if birthDates.count >= 2 {
-            let uniqueDates = Set(birthDates.map(\.normalized))
-            let status: ReviewStatus = uniqueDates.count == 1 ? .ready : .blocked
-            findings.append(
-                AuditFinding(
-                    status: status,
-                    category: .identity,
-                    title: status == .ready ? "생년월일이 문서에서 일치해요" : "생년월일이 문서마다 달라요",
-                    summary: status == .ready ? "민감값을 마스킹한 상태로 일치 여부만 확인했습니다." : "서로 다른 생년월일 표기가 발견되어 제출 전 수정이 필요합니다.",
-                    action: status == .ready ? "여권 원본과도 최종 대조하세요." : "여권의 생년월일을 기준으로 잘못된 문서를 수정하세요.",
-                    evidences: birthDates.map {
-                        $0.evidence(label: "생년월일", maskedExcerpt: maskDate($0.normalized))
-                    }
-                )
-            )
-        } else if coreFacts.count >= 2 {
-            findings.append(
-                AuditFinding(
-                    status: .humanReview,
-                    category: .identity,
-                    title: "생년월일을 문서 간 대조하지 못했어요",
-                    summary: birthDates.isEmpty
-                        ? "핵심 문서에서 생년월일 필드를 확실하게 추출하지 못했습니다."
-                        : "생년월일은 한 문서에서만 확인되어 교차 검증할 수 없습니다.",
-                    action: "생년월일이 기재된 제출 서류를 여권 원본과 직접 대조하세요.",
-                    evidences: birthDates.isEmpty
-                        ? coreFacts.prefix(2).map {
-                            EvidenceRef(
-                                documentName: $0.document.filename,
-                                documentType: $0.document.type,
-                                excerpt: "not_stated · 생년월일 자동 추출 불가",
-                                fieldLabel: "생년월일"
-                            )
-                        }
-                        : birthDates.map { $0.evidence(label: "생년월일", maskedExcerpt: maskDate($0.normalized)) }
-                )
-            )
-        }
         return findings
     }
 
@@ -686,7 +695,8 @@ struct AuditEngine {
     private func requirementConstraintFindings(
         requirements: [RequirementItem],
         documents: [DocumentItem],
-        extracted: [UUID: ExtractedDocument]
+        extracted: [UUID: ExtractedDocument],
+        documentValidations: [UUID: SubmissionDocumentValidation]
     ) -> [AuditFinding] {
         var findings: [AuditFinding] = []
 
@@ -730,7 +740,9 @@ struct AuditEngine {
                 continue
             }
 
-            guard let document = documents.first(where: { $0.type == type && $0.processingStatus == .ready }) else {
+            guard let document = documents.first(where: {
+                isVerified($0, for: type, documentValidations: documentValidations)
+            }) else {
                 // Requirement-derived completeness findings already report missing
                 // files and quantities once per document type.
                 continue

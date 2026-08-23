@@ -6,6 +6,7 @@ import Security
 enum StudioAgentPurpose: String, Sendable {
     case graduateRequirements
     case applicantIdentity
+    case submissionDocumentValidation
     case applicationPackageAudit
 }
 
@@ -32,6 +33,13 @@ enum StudioAgentCatalog {
                 agentID: "agt_3cdAfCvWFyKwDeS6tCw9vJ",
                 configID: "3",
                 displayName: "지원자 신원 검증 Agent"
+            )
+        case .submissionDocumentValidation:
+            StudioAgentConfiguration(
+                purpose: .submissionDocumentValidation,
+                agentID: "agt_bmpcUYqLfdAfzbZy7cDQ48",
+                configID: "1",
+                displayName: "제출 서류 검증 Agent"
             )
         case .applicationPackageAudit:
             // Add its Agent ID and Config ID here when the package-audit Agent exists.

@@ -218,7 +218,7 @@ struct OverviewView: View {
                         message: auditedWorkspaceCount == 0
                             ? "검수할 지원 항목을 선택하면 전체 우선순위가 여기에 모입니다."
                             : "현재 전체 검수 결과에서 수정이 필요한 항목이 없습니다.",
-                        actionTitle: auditedWorkspaceCount == 0 ? "새 지원 목표 만들기" : nil,
+                        actionTitle: auditedWorkspaceCount == 0 ? "새 지원서 만들기" : nil,
                         action: auditedWorkspaceCount == 0 ? { state.showNewWorkspace = true } : nil
                     )
                 } else {
